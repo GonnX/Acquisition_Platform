@@ -10,6 +10,7 @@ import android.content.DialogInterface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.os.Debug;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -17,9 +18,11 @@ import android.os.Message;
 import android.os.Vibrator;
 import android.support.annotation.Nullable;
 import android.support.annotation.RequiresApi;
+import android.support.transition.Slide;
 import android.text.Html;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -56,10 +59,18 @@ public class GsrView extends Fragment{
     private String selectSampleRate;
 
     private Handler measureAcupoint_Handler;
+    private Handler TimeDialog_Timer_Handler;
     private Handler mHandler;
 
-    private TimerTask timerTask = null;
-    private Timer timer = null;
+    private AlertDialog.Builder TimeDialog_Builder;
+    private AlertDialog TimeDialog;
+
+    private TimerTask timerTask_updateImage = null;
+    private Timer timer_updateImage = null;
+
+    private CountDownTimer TimeDialog_Timer = null;
+
+    private View dialogView;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
@@ -75,6 +86,15 @@ public class GsrView extends Fragment{
 
         mHandler = new Handler();
         measureAcupoint_Handler = new Handler();
+        TimeDialog_Timer_Handler = new Handler();
+
+
+        dialogView = View.inflate(inflater.getContext(),R.layout.dialog,null);
+
+        TimeDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext());
+        TimeDialog = TimeDialog_Builder.create();
+        TimeDialog.setView(dialogView);
+        TimeDialog.getWindow().setGravity(Gravity.BOTTOM);
 
         startFlag = false;
 
@@ -99,26 +119,17 @@ public class GsrView extends Fragment{
             public void onClick(View view) {
                 ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
 
-                timer = new Timer();
+                timer_updateImage = new Timer();
 
-                timerTask = new TimerTask() {
+                timerTask_updateImage = new TimerTask() {
                     @Override
                     public void run() {
-                        byte[] buf = new byte[1];
-
-                        if(selectSampleRate.equals(sampleRate_Item[0]))
-                            buf[0] = 0x30;
-                        else if(selectSampleRate.equals(sampleRate_Item[1]))
-                            buf[0] = 0x31;
-                        else
-                            buf[0] = 0x32;
-
-                        mPhysicaloid.write(buf, buf.length);
 
                         UpdateAcupointImage();
+                        DialogShow(inflater);
                     }
                 };
-                timer.schedule(timerTask,0,3000);
+                timer_updateImage.schedule(timerTask_updateImage,0,4000);
             }
         });
 
@@ -169,16 +180,56 @@ public class GsrView extends Fragment{
             @Override
             public void run() {
                 acupointImage.setBackgroundResource((Integer) imageResource[counter++]);
+                measureAcupoint_Handler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        byte[] buf = new byte[1];
+
+                        if(selectSampleRate.equals(sampleRate_Item[0]))
+                            buf[0] = 0x30;
+                        else if(selectSampleRate.equals(sampleRate_Item[1]))
+                            buf[0] = 0x31;
+                        else
+                            buf[0] = 0x32;
+
+                        mPhysicaloid.write(buf, buf.length);
+                    }
+                },3000);
+                if(counter == 6) {
+                    counter = 0;
+                    timer_updateImage.cancel();
+                    timer_updateImage = null;
+
+                    timerTask_updateImage.cancel();
+                    timerTask_updateImage = null;
+                }
             }
         });
-        if(counter == 6) {
-            counter = 0;
-            timer.cancel();
-            timer = null;
-
-            timerTask.cancel();
-            timerTask = null;
-        }
+    }
+    private void DialogShow(final LayoutInflater inflater){
+        TimeDialog_Timer_Handler.post(new Runnable() {
+            @Override
+            public void run() {
+                TimeDialog_Timer = new CountDownTimer(3000,1000){
+                    @Override
+                    public void onTick(final long millisUntilFinished) {
+                        TimeDialog_Timer_Handler.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                TextView tv = TimeDialog.findViewById(R.id.dialog_tv);
+                                tv.setText(new String(String.valueOf(millisUntilFinished / 1000)));
+                            }
+                        });
+                        TimeDialog.show();
+                    }
+                    @Override
+                    public void onFinish() {
+                        TimeDialog.dismiss();
+                    }
+                };
+                TimeDialog_Timer.start();
+            }
+        });
     }
 
     private void tvAppend(TextView tv, CharSequence text) {
