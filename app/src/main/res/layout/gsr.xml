@@ -40,22 +40,30 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/start_btn"
-                android:layout_width="match_parent"
+                android:id="@+id/back_btn"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginRight="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/show_image"
+                android:text="Back"/>
+
+            <Button
+                android:id="@+id/start_btn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:background="@drawable/show_image"
                 android:text="Start"/>
 
             <Button
-                android:id="@+id/back_btn"
-                android:layout_width="match_parent"
+                android:id="@+id/next_btn"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="3dp"
                 android:layout_weight="1"
                 android:background="@drawable/show_image"
-                android:text="Back"/>
+                android:text="Next"/>
 
         </LinearLayout>
 
@@ -68,12 +76,12 @@
             android:background="@drawable/show_image"
             android:text="setSampleRate"/>
 
-    </LinearLayout>
+        <com.jjoe64.graphview.GraphView
+            android:id="@+id/data_chart"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:layout_marginTop="5dp"/>
 
-    <TextView
-        android:id="@+id/textView"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="TextView"/>
+    </LinearLayout>
 
 </LinearLayout>
