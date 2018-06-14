@@ -38,10 +38,13 @@ import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
+import java.util.LinkedList;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class GsrView extends Fragment{
+
+    private final int SerialDataSize = 400;
 
     private Button startBtn;
     private Button backBtn;
@@ -79,6 +82,12 @@ public class GsrView extends Fragment{
     private GraphView G_Graph;
     private LineGraphSeries<DataPoint> G_Series;
 
+    private double mXPoint;
+
+    private byte[] SerialData_Queue = new byte[SerialDataSize];
+    private int Queue_Index_Rear = 0;
+    private int Queue_Index_Front = 0;
+
     @RequiresApi(api = Build.VERSION_CODES.M)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
 
@@ -87,14 +96,6 @@ public class GsrView extends Fragment{
         G_Graph = gsrView.findViewById(R.id.data_chart);
 
         ResetGraph();
-
-        G_Graph.post(new Runnable() {
-            @Override
-            public void run() {
-                G_Series.appendData(new DataPoint(10,250),true,50);
-                G_Graph.getViewport().setMaxX(50);
-            }
-        });
 
         acupointImage = gsrView.findViewById(R.id.Gsr_ImageView);
 
@@ -135,6 +136,7 @@ public class GsrView extends Fragment{
             @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
             @Override
             public void onClick(View view) {
+                ResetGraph();
                 StartBtn_Click(inflater);
 //                timer_updateImage = new Timer();
 //
@@ -199,17 +201,70 @@ public class GsrView extends Fragment{
 
         return gsrView;
     }
+    private void UpdateGraph(final int size){
+        G_Graph.post(new Runnable() {
+            @Override
+            public void run() {
+                AppedSeriesData(size);
+                G_Graph.getViewport().setMaxX(mXPoint);
+                G_Graph.getViewport().setMinX(0);
+                //G_Graph.getViewport().setMinX(mXPoint - 1);
+                //mXPoint += 1;
+                //G_Graph.postDelayed(this,50);
+            }
+        });
+    }
+    private void AppedSeriesData(int size)
+    {
+        if(size % 2 == 0) {
+            for(int i = 0; i < size / 2; i++) {
+                int data = (int)(PopSerialData() << 8);
+                int data2 =  (int)(PopSerialData());
+
+                if(data2 < 0)
+                    data2 += 256;
+
+                G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
+            }
+        }
+        else{
+            for(int i = 0 ; i < (size - 1) / 2; i++) {
+                int data = (int)(PopSerialData() << 8);
+                int data2 =  (int)(PopSerialData());
+
+                if(data2 < 0)
+                    data2 += 256;
+
+                G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
+            }
+        }
+    }
     private void ResetGraph()
     {
-        G_Graph.getViewport().setMaxX(1);
+        G_Graph.getViewport().setMaxX(5);
         G_Graph.getViewport().setMaxY(1023);
         G_Graph.getViewport().setYAxisBoundsManual(true);
+
+        G_Graph.getViewport().setMinX(0);
+        G_Graph.getGridLabelRenderer().setHighlightZeroLines(false);
+//        G_Graph.getGridLabelRenderer().setGridStyle(GridLabelRenderer.GridStyle.HORIZONTAL);
+//        G_Graph.getGridLabelRenderer().setNumVerticalLabels(3);
+//        G_Graph.getGridLabelRenderer().setPadding(15);
+        G_Graph.getViewport().setXAxisBoundsManual(true);
 
         G_Graph.getGridLabelRenderer().reloadStyles();
 
         G_Graph.removeAllSeries();
         G_Series = new LineGraphSeries<DataPoint>();
         G_Graph.addSeries(G_Series);
+
+        Queue_Index_Rear = 0;
+        Queue_Index_Front = 0;
+
+        for(int i = 0 ; i < SerialData_Queue.length ; i++)
+            SerialData_Queue[i] = 0;
+
+        mXPoint = 0.0;
     }
     private void UpdateAcupointImage(final int state, final int index){
         measureAcupoint_Handler.post(new Runnable() {
@@ -315,22 +370,46 @@ public class GsrView extends Fragment{
             Toast.makeText(inflater.getContext(), "open", Toast.LENGTH_SHORT).show();
             mPhysicaloid.addReadListener(new ReadLisener() {
                 @Override
-                public void onRead(int i) {
-                    byte[] buf = new byte[i];
-                    mPhysicaloid.read(buf, i);
-                    SetChoice(buf,i,inflater);
+                public void onRead(int size) {
+                    byte[] buf = new byte[size];
+                    mPhysicaloid.read(buf, size);
+                    SetChoice(buf,size,inflater);
                 }
             });
         }
     }
+    private void PushSerialData(byte[] data,int size)
+    {
+        for(int i = 0 ; i < size ; i++) {
+            if(Queue_Index_Front == (SerialDataSize - 1))
+                Queue_Index_Front = 0;
+            SerialData_Queue[Queue_Index_Rear++] = data[i];
+        }
+    }
+    private byte PopSerialData()
+    {
+        if(Queue_Index_Front == (SerialDataSize - 1))
+            Queue_Index_Front = 0;
+        return SerialData_Queue[Queue_Index_Front++];
+    }
     private void SetChoice(byte[] buf,int size,LayoutInflater inflater){
         if(size == 1){
-            if(buf[0] == '0')
+            if(buf[0] == 'B')
                 BackBtn_Click(inflater);
-            else if(buf[0] == '1')
+            else if(buf[0] == 'S') {
+                ResetGraph();
                 StartBtn_Click(inflater);
-            else
+            }
+            else if(buf[0] == 'N')
                 NextBtn_Click(inflater);
+            else {
+                PushSerialData(buf, size);
+                UpdateGraph(size);
+            }
+        }
+        else {
+            PushSerialData(buf,size);
+            UpdateGraph(size);
         }
     }
 
