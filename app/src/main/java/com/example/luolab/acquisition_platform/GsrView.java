@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Debug;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -38,13 +39,24 @@ import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Calendar;
 import java.util.LinkedList;
 import java.util.Timer;
 import java.util.TimerTask;
 
 public class GsrView extends Fragment{
 
-    private final int SerialDataSize = 400;
+    private final int SerialDataSize = 420;
+
+    private File f;
+    private String FilePath = null;
 
     private Button startBtn;
     private Button backBtn;
@@ -63,6 +75,7 @@ public class GsrView extends Fragment{
 
     private String[] sampleRate_Item;
     private String selectSampleRate;
+    private String[] acupointName;
 
     private Handler Graph_Handle;
     private Handler measureAcupoint_Handler;
@@ -82,11 +95,23 @@ public class GsrView extends Fragment{
     private GraphView G_Graph;
     private LineGraphSeries<DataPoint> G_Series;
 
-    private double mXPoint;
+    private int mXPoint;
+    private boolean FileFlag = false;
+
+    private int[] TempSize = new int[2];
+    private int SizeIndex = 0;
 
     private byte[] SerialData_Queue = new byte[SerialDataSize];
     private int Queue_Index_Rear = 0;
     private int Queue_Index_Front = 0;
+
+    private File dataPointsFile;
+    private File fftOutFile;
+    private FileWriter[] fileWriter;
+    private BufferedWriter[] bw;
+
+    private Calendar c;
+    private SimpleDateFormat dateformat;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
@@ -107,7 +132,6 @@ public class GsrView extends Fragment{
         TimeDialog_Timer_Handler = new Handler();
         Graph_Handle = new Handler();
 
-
         dialogView = View.inflate(inflater.getContext(),R.layout.dialog,null);
 
         TimeDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext());
@@ -117,8 +141,26 @@ public class GsrView extends Fragment{
 
         startFlag = false;
 
+        acupointName = new String[]{"太淵","大陵","神門","陽谷","陽池","陽谿"};
         sampleRate_Item = new String[]{"50","100","200"};
         selectSampleRate = null;
+
+        fileWriter = new FileWriter[6];
+        bw = new BufferedWriter[6];
+
+        for(int i = 0 ; i < fileWriter.length ; i++) {
+            fileWriter[i] = null;
+            bw[i] = null;
+        }
+
+        c = Calendar.getInstance();
+        dateformat  = new SimpleDateFormat("yyyyMMddHHmmss");
+
+        FilePath = String.valueOf(inflater.getContext().getExternalFilesDir(null)) + "/GSR";
+        f = new File(String.valueOf(FilePath));
+        f.mkdir();
+
+        //CheckFileExists(inflater);
 
         mPhysicaloid = new Physicaloid((Activity)inflater.getContext());
         mPhysicaloid.open();
@@ -137,7 +179,26 @@ public class GsrView extends Fragment{
             @Override
             public void onClick(View view) {
                 ResetGraph();
+                CheckWrite(inflater);
                 StartBtn_Click(inflater);
+//                for(int i = 0 ; i < bw.length ; i++)
+//                {
+//                    if(bw[i] != null){
+//                        try {
+//                            bw[i].close();
+//                        } catch (IOException e) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//
+//                    bw[i] = new BufferedWriter(fileWriter[i]);
+//
+//                    try {
+//                        bw[i].newLine();
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+//                }
 //                timer_updateImage = new Timer();
 //
 //                timerTask_updateImage = new TimerTask() {
@@ -201,7 +262,30 @@ public class GsrView extends Fragment{
 
         return gsrView;
     }
-    private void UpdateGraph(final int size){
+//    private void CheckFileExists(LayoutInflater inflater)
+//    {
+//        File f;
+//        for(int i = 0 ; i < acupointName.length ; i++) {
+//            f = new File(inflater.getContext().getExternalFilesDir(null) + "/" + acupointName[i] + ".txt");
+//            if(f.exists()){
+//                f.delete();
+//            }
+//            f = null;
+//        }
+//    }
+    private void CreateUserInfo(LayoutInflater inflater)
+    {
+        new AlertDialog.Builder((Activity)inflater.getContext()).setTitle("CreatUserInfo")
+                .setPositiveButton("ok", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                })
+                .create()
+                .show();
+    }
+    private void UpdateGraph(final int size,LayoutInflater inflater){
         G_Graph.post(new Runnable() {
             @Override
             public void run() {
@@ -216,7 +300,38 @@ public class GsrView extends Fragment{
     }
     private void AppedSeriesData(int size)
     {
-        if(size % 2 == 0) {
+        if(size % 2 != 0){
+            TempSize[SizeIndex] = size;
+        }
+        if(SizeIndex > 0 && (TempSize[0] + size) % 2 != 0){
+            for(int i = 0; i < (size + TempSize[0] - 1) / 2; i++) {
+                int data = (int)(PopSerialData() << 8);
+                int data2 =  (int)(PopSerialData());
+
+                if(data2 < 0)
+                    data2 += 256;
+
+                G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
+            }
+            SizeIndex = 0;
+            TempSize[0] = 1;
+            TempSize[1] = 0;
+        }
+        else if(SizeIndex > 0 && (TempSize[0] + size) % 2 == 0){
+            for(int i = 0; i < (size + TempSize[0]) / 2; i++) {
+                int data = (int)(PopSerialData() << 8);
+                int data2 =  (int)(PopSerialData());
+
+                if(data2 < 0)
+                    data2 += 256;
+
+                G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
+            }
+            SizeIndex = -1;
+            TempSize[0] = 0;
+            TempSize[1] = 0;
+        }
+        else if(size % 2 == 0){
             for(int i = 0; i < size / 2; i++) {
                 int data = (int)(PopSerialData() << 8);
                 int data2 =  (int)(PopSerialData());
@@ -227,17 +342,63 @@ public class GsrView extends Fragment{
                 G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
             }
         }
-        else{
-            for(int i = 0 ; i < (size - 1) / 2; i++) {
-                int data = (int)(PopSerialData() << 8);
-                int data2 =  (int)(PopSerialData());
+        if(mXPoint == Integer.parseInt(selectSampleRate))
+            FileFlag = true;
+        SizeIndex++;
+//        if(size % 2 == 0) {
+//            for (int i = 0; i < size / 2; i++) {
+//                int data = (int) (PopSerialData() << 8);
+//                int data2 = (int) (PopSerialData());
+//
+//                if (data2 < 0)
+//                    data2 += 256;
+//
+//                G_Series.appendData(new DataPoint(mXPoint++, data + data2), true, 400);
+//            }
+//        }
+//        else{
+//            for (int i = 0; i < (size - 1) / 2; i++) {
+//                int data = (int) (PopSerialData() << 8);
+//                int data2 = (int) (PopSerialData());
+//
+//                if (data2 < 0)
+//                    data2 += 256;
+//
+//                G_Series.appendData(new DataPoint(mXPoint++, data + data2), true, 400);
+//            }
+//        }
+    }
+    private void CheckWrite(final LayoutInflater inflater){
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if(FileFlag == true){
+                    try{
+                        fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + "_" + acupointName[counter] + ".txt",false);
+                        bw[counter] = new BufferedWriter(fileWriter[counter]);
+                        bw[counter].write("SampleRate = " + selectSampleRate);
+                        bw[counter].newLine();
+                        bw[counter].newLine();
+                        bw[counter].write("[ ");
+                        for(int i = 0 ; i < Integer.parseInt(selectSampleRate) * 2 - 1 ; i+=2){
+                            int data = (int)(SerialData_Queue[i] << 8);
+                            int data2 =  (int)(SerialData_Queue[i + 1]);
 
-                if(data2 < 0)
-                    data2 += 256;
+                            if(data2 < 0)
+                                data2 += 256;
 
-                G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
+                            bw[counter].write(new String(String.valueOf(data + data2)) + " , ");
+                        }
+                        bw[counter].write(" ]");
+                        bw[counter].close();
+                        FileFlag = false;
+                    }catch(IOException e){
+                        e.printStackTrace();
+                    }
+                }
+                mHandler.post(this);
             }
-        }
+        });
     }
     private void ResetGraph()
     {
@@ -264,7 +425,11 @@ public class GsrView extends Fragment{
         for(int i = 0 ; i < SerialData_Queue.length ; i++)
             SerialData_Queue[i] = 0;
 
-        mXPoint = 0.0;
+        mXPoint = 0;
+
+        TempSize[0] = 0;
+        TempSize[1] = 0;
+        SizeIndex = 0;
     }
     private void UpdateAcupointImage(final int state, final int index){
         measureAcupoint_Handler.post(new Runnable() {
@@ -378,6 +543,11 @@ public class GsrView extends Fragment{
             });
         }
     }
+
+    private boolean isEmpty()
+    {
+        return Queue_Index_Front == Queue_Index_Rear;
+    }
     private void PushSerialData(byte[] data,int size)
     {
         for(int i = 0 ; i < size ; i++) {
@@ -404,15 +574,14 @@ public class GsrView extends Fragment{
                 NextBtn_Click(inflater);
             else {
                 PushSerialData(buf, size);
-                UpdateGraph(size);
+                UpdateGraph(size,inflater);
             }
         }
         else {
             PushSerialData(buf,size);
-            UpdateGraph(size);
+            UpdateGraph(size,inflater);
         }
     }
-
     private void StartBtn_Click(LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
         byte[] Data = new byte[1];
@@ -427,8 +596,18 @@ public class GsrView extends Fragment{
     }
     private void NextBtn_Click(LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
-        if(counter == 5)
-            UpdateAcupointImage(1,5);
+        if(counter == 5) {
+            UpdateAcupointImage(1, 5);
+            new AlertDialog.Builder((Activity)inflater.getContext()).setMessage("已量完，已是最後一個量測點")
+                    .setPositiveButton("ok", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialog, int which) {
+
+                        }
+                    })
+                    .create()
+                    .show();
+        }
         else
             UpdateAcupointImage(1,++counter);
     }

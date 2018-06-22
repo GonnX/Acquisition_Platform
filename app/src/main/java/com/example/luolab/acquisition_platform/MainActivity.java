@@ -25,12 +25,17 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.physicaloid.lib.Physicaloid;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -59,12 +64,13 @@ public class MainActivity extends AppCompatActivity {
     private ImageView acupointImage;
     private Button gsrBtn;
 
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        // Create the adapter that will return a fragment for each of the three
+                // Create the adapter that will return a fragment for each of the three
         // primary sections of the activity.
         mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
 
@@ -127,7 +133,7 @@ public class MainActivity extends AppCompatActivity {
             View rootView;
             if(getArguments().getInt(ARG_SECTION_NUMBER) == 1)
             {
-                rootView = inflater.inflate(R.layout.ppg, container, false);
+                rootView = inflater.inflate(R.layout.ppg,container,false);
             }
             else
             {
