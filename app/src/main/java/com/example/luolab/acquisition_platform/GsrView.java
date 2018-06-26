@@ -27,6 +27,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -62,6 +63,7 @@ public class GsrView extends Fragment{
     private Button backBtn;
     private Button nextBtn;
     private Button setSampleRateBtn;
+    private Button setUsrInfoBtn;
 
     private ImageView acupointImage;
     private View gsrView;
@@ -81,9 +83,13 @@ public class GsrView extends Fragment{
     private Handler measureAcupoint_Handler;
     private Handler TimeDialog_Timer_Handler;
     private Handler mHandler;
+    private Handler Update_GsrValue;
 
-    private AlertDialog.Builder TimeDialog_Builder;
-    private AlertDialog TimeDialog;
+//    private AlertDialog.Builder TimeDialog_Builder;
+//    private AlertDialog TimeDialog;
+
+    private AlertDialog.Builder UsrInfoDialog_Builder;
+    private AlertDialog UsrInfoDialog;
 
     private TimerTask timerTask_updateImage = null;
     private Timer timer_updateImage = null;
@@ -110,8 +116,14 @@ public class GsrView extends Fragment{
     private FileWriter[] fileWriter;
     private BufferedWriter[] bw;
 
+    private TextView[] UsrInfo = new TextView[3];
+
     private Calendar c;
     private SimpleDateFormat dateformat;
+
+    private TextView GsrValue_tv;
+    private double MeanGsrValue = 0.0;
+    private double TempMeanGsrValue = 0.0;
 
     @RequiresApi(api = Build.VERSION_CODES.M)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
@@ -127,17 +139,40 @@ public class GsrView extends Fragment{
         imageResource = new Object[]{R.drawable.one,R.drawable.two,R.drawable.three,
                                      R.drawable.four,R.drawable.five,R.drawable.six};
 
+        GsrValue_tv = gsrView.findViewById(R.id.GsrAvg_tv);
+
         mHandler = new Handler();
         measureAcupoint_Handler = new Handler();
         TimeDialog_Timer_Handler = new Handler();
+        Update_GsrValue = new Handler();
         Graph_Handle = new Handler();
 
-        dialogView = View.inflate(inflater.getContext(),R.layout.dialog,null);
+        dialogView = View.inflate(inflater.getContext(),R.layout.user_info,null);
 
-        TimeDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext());
-        TimeDialog = TimeDialog_Builder.create();
-        TimeDialog.setView(dialogView);
-        TimeDialog.getWindow().setGravity(Gravity.BOTTOM);
+        UsrInfoDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext())
+                .setTitle("CreatUsrInfo")
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                UsrInfo[0] = UsrInfoDialog.findViewById(R.id.Name_tv);
+                UsrInfo[1] = UsrInfoDialog.findViewById(R.id.Age_tv);
+                UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
+
+                if(UsrInfo[0].getText().toString().equals("") || UsrInfo[1].getText().toString().equals("") || UsrInfo[2].getText().toString().equals(""))
+                {
+                    Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
+                }
+                else
+                    setEnabledUi(2);
+            }
+        });
+        UsrInfoDialog = UsrInfoDialog_Builder.create();
+        UsrInfoDialog.setView(dialogView);
+
+//        TimeDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext());
+//        TimeDialog = TimeDialog_Builder.create();
+//        TimeDialog.setView(dialogView);
+//        TimeDialog.getWindow().setGravity(Gravity.BOTTOM);
 
         startFlag = false;
 
@@ -153,7 +188,6 @@ public class GsrView extends Fragment{
             bw[i] = null;
         }
 
-        c = Calendar.getInstance();
         dateformat  = new SimpleDateFormat("yyyyMMddHHmmss");
 
         FilePath = String.valueOf(inflater.getContext().getExternalFilesDir(null)) + "/GSR";
@@ -239,10 +273,9 @@ public class GsrView extends Fragment{
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 if(selectSampleRate != null) {
+                                    setEnabledUi(0);
                                     if (!startFlag)
                                         setSerialOpen(inflater);
-
-                                    setEnabledUi(0);
                                 }
                             }
                         })
@@ -258,7 +291,16 @@ public class GsrView extends Fragment{
             }
         });
 
+        setUsrInfoBtn = gsrView.findViewById(R.id.setUsrInfo_btn);
+        setUsrInfoBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                UsrInfoDialog.show();
+            }
+        });
+
         setEnabledUi(1);
+        UpdateGsrValue(inflater);
 
         return gsrView;
     }
@@ -273,17 +315,20 @@ public class GsrView extends Fragment{
 //            f = null;
 //        }
 //    }
-    private void CreateUserInfo(LayoutInflater inflater)
+    private void UpdateGsrValue(final LayoutInflater inflater)
     {
-        new AlertDialog.Builder((Activity)inflater.getContext()).setTitle("CreatUserInfo")
-                .setPositiveButton("ok", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-
-                    }
-                })
-                .create()
-                .show();
+        Update_GsrValue.post(new Runnable() {
+            @Override
+            public void run() {
+                if((int)TempMeanGsrValue > 508 && (int)TempMeanGsrValue < 513)
+                {
+                    Toast.makeText(inflater.getContext(),"尚未接觸皮膚量測，請接觸皮膚重新量測",Toast.LENGTH_SHORT).show();
+                    TempMeanGsrValue = 0.0;
+                }
+                GsrValue_tv.setText(new String(String.valueOf(MeanGsrValue)));
+                Update_GsrValue.post(this);
+            }
+        });
     }
     private void UpdateGraph(final int size,LayoutInflater inflater){
         G_Graph.post(new Runnable() {
@@ -345,28 +390,29 @@ public class GsrView extends Fragment{
         if(mXPoint == Integer.parseInt(selectSampleRate))
             FileFlag = true;
         SizeIndex++;
-//        if(size % 2 == 0) {
-//            for (int i = 0; i < size / 2; i++) {
-//                int data = (int) (PopSerialData() << 8);
-//                int data2 = (int) (PopSerialData());
-//
-//                if (data2 < 0)
-//                    data2 += 256;
-//
-//                G_Series.appendData(new DataPoint(mXPoint++, data + data2), true, 400);
-//            }
-//        }
-//        else{
-//            for (int i = 0; i < (size - 1) / 2; i++) {
-//                int data = (int) (PopSerialData() << 8);
-//                int data2 = (int) (PopSerialData());
-//
-//                if (data2 < 0)
-//                    data2 += 256;
-//
-//                G_Series.appendData(new DataPoint(mXPoint++, data + data2), true, 400);
-//            }
-//        }
+    }
+    private void SetFileHeader(BufferedWriter bw)
+    {
+        try {
+            bw.write("量測時間 : " + dateformat.format(c.getTime()));
+            bw.newLine();
+            bw.newLine();
+            bw.write("年齡 : " + UsrInfo[1].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("生日 : " + UsrInfo[2].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("SampleRate = " + selectSampleRate);
+            bw.newLine();
+            bw.newLine();
+            bw.write("訊號 : ");
+            bw.newLine();
+            bw.newLine();
+            bw.write("[ ");
+        }catch(IOException e){
+            e.printStackTrace();
+        }
     }
     private void CheckWrite(final LayoutInflater inflater){
         mHandler.post(new Runnable() {
@@ -374,12 +420,12 @@ public class GsrView extends Fragment{
             public void run() {
                 if(FileFlag == true){
                     try{
-                        fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + "_" + acupointName[counter] + ".txt",false);
+                        MeanGsrValue = 0.0;
+                        c = Calendar.getInstance();
+                        fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
                         bw[counter] = new BufferedWriter(fileWriter[counter]);
-                        bw[counter].write("SampleRate = " + selectSampleRate);
-                        bw[counter].newLine();
-                        bw[counter].newLine();
-                        bw[counter].write("[ ");
+                        SetFileHeader(bw[counter]);
+
                         for(int i = 0 ; i < Integer.parseInt(selectSampleRate) * 2 - 1 ; i+=2){
                             int data = (int)(SerialData_Queue[i] << 8);
                             int data2 =  (int)(SerialData_Queue[i + 1]);
@@ -387,8 +433,12 @@ public class GsrView extends Fragment{
                             if(data2 < 0)
                                 data2 += 256;
 
+                            MeanGsrValue = MeanGsrValue + (data + data2);
+
                             bw[counter].write(new String(String.valueOf(data + data2)) + " , ");
                         }
+                        MeanGsrValue = MeanGsrValue / Double.parseDouble(selectSampleRate);
+                        TempMeanGsrValue = MeanGsrValue;
                         bw[counter].write(" ]");
                         bw[counter].close();
                         FileFlag = false;
@@ -510,25 +560,28 @@ public class GsrView extends Fragment{
             startBtn.setEnabled(true);
             nextBtn.setEnabled(true);
             backBtn.setEnabled(true);
+            setUsrInfoBtn.setEnabled(true);
             setSampleRateBtn.setEnabled(true);
         }
         else if(state == 1){
             startBtn.setEnabled(false);
             backBtn.setEnabled(false);
             nextBtn.setEnabled(false);
-            setSampleRateBtn.setEnabled(true);
+            setSampleRateBtn.setEnabled(false);
+            setUsrInfoBtn.setEnabled(true);
         }
         else if(state == 2){
             startBtn.setEnabled(false);
             backBtn.setEnabled(false);
             nextBtn.setEnabled(false);
-            setSampleRateBtn.setEnabled(false);
+            setSampleRateBtn.setEnabled(true);
+            setUsrInfoBtn.setEnabled(true);
         }
-        else if(state == 3){
-            startBtn.setEnabled(false);
-            backBtn.setEnabled(true);
-            setSampleRateBtn.setEnabled(false);
-        }
+//        else if(state == 3){
+//            startBtn.setEnabled(false);
+//            backBtn.setEnabled(true);
+//            setSampleRateBtn.setEnabled(false);
+//        }
     }
     private void setSerialOpen(final LayoutInflater inflater) {
         if (mPhysicaloid.open()) {
@@ -598,7 +651,7 @@ public class GsrView extends Fragment{
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
         if(counter == 5) {
             UpdateAcupointImage(1, 5);
-            new AlertDialog.Builder((Activity)inflater.getContext()).setMessage("已量完，已是最後一個量測點")
+            new AlertDialog.Builder((Activity)inflater.getContext()).setMessage("已量完，已是最後一個量測點" + '\n' + '\n' + "如需量測別的受測者" + '\n' + "請按setUsrInfo更改")
                     .setPositiveButton("ok", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {

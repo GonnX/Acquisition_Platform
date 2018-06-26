@@ -67,20 +67,59 @@
 
         </LinearLayout>
 
-        <Button
-            android:id="@+id/setSampleRate_btn"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:layout_weight="1"
-            android:background="@drawable/show_image"
-            android:text="setSampleRate"/>
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/setSampleRate_btn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginRight="3dp"
+                android:layout_marginTop="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/show_image"
+                android:text="setSampleRate"/>
+
+            <Button
+                android:id="@+id/setUsrInfo_btn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="3dp"
+                android:layout_marginTop="3dp"
+                android:layout_weight="1"
+                android:background="@drawable/show_image"
+                android:text="setUsrInfo"/>
+        </LinearLayout>
 
         <com.jjoe64.graphview.GraphView
             android:id="@+id/data_chart"
             android:layout_width="match_parent"
             android:layout_height="150dp"
             android:layout_marginTop="5dp"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/textView10"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="10dp"
+                android:text="GsrAvg : "
+                android:textSize="25dp"/>
+
+            <TextView
+                android:id="@+id/GsrAvg_tv"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="60dp"
+                android:text="TextView"
+                android:textSize="25dp"/>
+        </LinearLayout>
 
     </LinearLayout>
 

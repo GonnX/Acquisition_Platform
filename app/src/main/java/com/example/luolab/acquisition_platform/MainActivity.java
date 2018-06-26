@@ -22,6 +22,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -34,8 +35,10 @@ import android.widget.Toast;
 import com.physicaloid.lib.Physicaloid;
 
 import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -43,7 +46,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.util.Arrays;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity{
 
     /**
      * The {@link android.support.v4.view.PagerAdapter} that will provide
@@ -61,18 +64,17 @@ public class MainActivity extends AppCompatActivity {
      * The {@link ViewPager} that will host the section contents.
      */
     private ViewPager mViewPager;
-    private ImageView acupointImage;
-    private Button gsrBtn;
-
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-                // Create the adapter that will return a fragment for each of the three
+        // Create the adapter that will return a fragment for each of the three
         // primary sections of the activity.
         mSectionsPagerAdapter = new SectionsPagerAdapter(getSupportFragmentManager());
+
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         // Set up the ViewPager with the sections adapter.
         mViewPager = (ViewPager) findViewById(R.id.container);
@@ -133,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
             View rootView;
             if(getArguments().getInt(ARG_SECTION_NUMBER) == 1)
             {
-                rootView = inflater.inflate(R.layout.ppg,container,false);
+                rootView = (new PPGView()).onCreateView(inflater, container, savedInstanceState);
             }
             else
             {
