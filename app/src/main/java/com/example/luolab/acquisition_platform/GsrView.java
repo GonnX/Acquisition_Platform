@@ -116,7 +116,7 @@ public class GsrView extends Fragment{
     private FileWriter[] fileWriter;
     private BufferedWriter[] bw;
 
-    private TextView[] UsrInfo = new TextView[3];
+    private TextView[] UsrInfo = new TextView[5];
 
     private Calendar c;
     private SimpleDateFormat dateformat;
@@ -157,8 +157,11 @@ public class GsrView extends Fragment{
                 UsrInfo[0] = UsrInfoDialog.findViewById(R.id.Name_tv);
                 UsrInfo[1] = UsrInfoDialog.findViewById(R.id.Age_tv);
                 UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
+                UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
+                UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
 
-                if(UsrInfo[0].getText().toString().equals("") || UsrInfo[1].getText().toString().equals("") || UsrInfo[2].getText().toString().equals(""))
+                if(UsrInfo[0].getText().toString().equals("") || UsrInfo[1].getText().toString().equals("") || UsrInfo[2].getText().toString().equals("") ||
+                    UsrInfo[3].getText().toString().equals("") || UsrInfo[4].getText().toString().equals(""))
                 {
                     Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
                 }
@@ -401,6 +404,12 @@ public class GsrView extends Fragment{
             bw.newLine();
             bw.newLine();
             bw.write("生日 : " + UsrInfo[2].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("身高 : " + UsrInfo[3].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("體重 : " + UsrInfo[4].getText());
             bw.newLine();
             bw.newLine();
             bw.write("SampleRate = " + selectSampleRate);

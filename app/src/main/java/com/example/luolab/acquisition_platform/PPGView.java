@@ -1,21 +1,36 @@
 package com.example.luolab.acquisition_platform;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Fragment;
+import android.content.DialogInterface;
+import android.graphics.Color;
 import android.hardware.Camera;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.Nullable;
+import android.support.annotation.RequiresApi;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.TextView;
+import android.hardware.camera2.*;
+import android.widget.Toast;
+
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.GridLabelRenderer;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
 
 import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.Camera2Renderer;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
@@ -26,23 +41,27 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Stack;
+import java.util.logging.FileHandler;
 
 public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraViewListener2{
 
     private View ppgView;
 
-    private CameraBridgeViewBase mOpenCvCameraView;
+    private javaViewCameraControl mOpenCvCameraView;
 
     private UiDataBundle appData;
 
     private Handler mHandler;
+    private Handler fileHandler;
 
     private LayoutInflater LInflater;
 
-    private Mat myInputFrame;
+    private Mat myInputFrame = null;
 
     private DoubleTwoDimQueue dataQ;
     private int startPointer;
@@ -58,17 +77,46 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private boolean init_frames_discard;
     private boolean keep_thread_running;
 
-    private File dataPointsFile;
-    private File fftOutFile;
     private FileWriter fileWriter;
+    private BufferedWriter bw;
 
     private long BPM;
 
     private Stack<Long> timestampQ;
 
-    Camera camera;
-    Camera.Parameters parameters;
+    private TextView imgProcessed;
 
+    private TextView frameNum;
+    private TextView frameSize;
+    private TextView frameAvg;
+
+    private Button start_btn;
+    private Button setUiInfo_btn;
+
+    private boolean Flag = false;
+
+    private View dialogView;
+
+    private TextView[] UsrInfo = new TextView[5];
+
+    private AlertDialog.Builder UsrInfoDialog_Builder;
+    private AlertDialog UsrInfoDialog;
+
+    private GraphView G_Graph;
+    private LineGraphSeries<DataPoint> G_Series;
+
+    private int mXPoint;
+
+    private Calendar c;
+    private SimpleDateFormat dateformat;
+
+    private File f;
+    private String FilePath = null;
+
+    private Thread myThread;
+    private Thread myFFTThread;
+
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(getActivity()) {
         @Override
         public void onManagerConnected(int status) {
@@ -86,33 +134,251 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         }
     };
 
-    public void UpdateBPMUi() {
+    private void UpdateBPMUi() {
+        mHandler = new Handler(Looper.getMainLooper()){
+            @Override
+            public void handleMessage(Message inputMessage){
+                UiDataBundle incoming = (UiDataBundle) inputMessage.obj;
 
+                frameNum.setText("" + incoming.image_got);
+                frameSize.setText("" + incoming.frameSz);
+                int avg = (int) Math.round(incoming.frameAv);
+                frameAvg.setText("" + (255 - avg));
+
+
+                if(BPM > 0) {
+                    if(fftPoints < 1024){
+                        imgProcessed.setTextColor(Color.rgb(100,100,200));
+                    }
+                    else{
+                        imgProcessed.setTextColor(Color.rgb(100,200,100));
+                    }
+                    imgProcessed.setText("" + BPM);
+                }
+            }
+        };
     }
+    private void UpdateGraph(final double value){
+        G_Graph.post(new Runnable() {
+            @Override
+            public void run() {
+                G_Series.appendData(new DataPoint(mXPoint,value), true, 10000);
+                G_Graph.getViewport().setMaxX(mXPoint);
+                //G_Graph.getViewport().setMinX(0);
+                G_Graph.getViewport().setMinX(mXPoint - 100);
+                mXPoint += 1;
+                //G_Graph.postDelayed(this,50);
+            }
+        });
+    }
+    private void ResetGraph()
+    {
+        G_Graph.getViewport().setMaxX(5);
+        //G_Graph.getViewport().setMaxY(255);
+        G_Graph.getViewport().setMaxY(90);
+        G_Graph.getViewport().setMinY(20);
+        G_Graph.getViewport().setYAxisBoundsManual(true);
 
+        G_Graph.getViewport().setMinX(0);
+        G_Graph.getGridLabelRenderer().setHighlightZeroLines(false);
+//        G_Graph.getGridLabelRenderer().setGridStyle(GridLabelRenderer.GridStyle.HORIZONTAL);
+//        G_Graph.getGridLabelRenderer().setNumVerticalLabels(3);
+//        G_Graph.getGridLabelRenderer().setPadding(15);
+        G_Graph.getViewport().setXAxisBoundsManual(true);
+
+        G_Graph.getGridLabelRenderer().reloadStyles();
+
+        G_Graph.removeAllSeries();
+        G_Series = new LineGraphSeries<DataPoint>();
+        G_Graph.addSeries(G_Series);
+        mXPoint = 0;
+    }
+    private void setUi(int state){
+        if(state == 0){
+            start_btn.setEnabled(false);
+            setUiInfo_btn.setEnabled(true);
+        }else{
+            start_btn.setEnabled(true);
+            setUiInfo_btn.setEnabled(true);
+        }
+    }
+    private void OutputFile()
+    {
+        fileHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if(Flag){
+                    try {
+                        keep_thread_running = false;
+                        new AlertDialog.Builder((Activity)LInflater.getContext()).setMessage("已量完畢，" + '\n' + '\n' + "如需量測別的受測者" + '\n' + "請按setUsrInfo更改")
+                                .setPositiveButton("ok", new DialogInterface.OnClickListener() {
+                                    @Override
+                                    public void onClick(DialogInterface dialog, int which) {
+
+                                    }
+                                })
+                                .create()
+                                .show();
+                        c = Calendar.getInstance();
+                        fileWriter = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + ".txt",false);
+                        bw = new BufferedWriter(fileWriter);
+                        SetFileHeader(bw);
+                        bw.write(Arrays.toString(dataQ.toArray(0, endPointer, 0)));
+                        bw.close();
+
+                        VarReset();
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                fileHandler.postDelayed(this,1000);
+            }
+        },1000);
+    }
+    private void VarReset()
+    {
+        timestampQ = null;
+        timestampQ = new Stack<Long>();
+        dataQ = null;
+        dataQ = new DoubleTwoDimQueue();
+
+        bad_frame_count = 0;
+        startPointer = 0;
+        endPointer = 0;
+        fftPoints = 1024;
+        image_processed = 0;
+        first_fft_run = true;
+        keep_thread_running = false;
+        init_frames_discard = false;
+        FPS = 30;
+        BPM = 0;
+        state_fft = 0;
+        Flag = false;
+        appData.image_got = 0;
+        appData.frameAv = 0;
+    }
+    private void SetFileHeader(BufferedWriter bw)
+    {
+        try {
+            bw.write("量測時間 : " + dateformat.format(c.getTime()));
+            bw.newLine();
+            bw.newLine();
+            bw.write("年齡 : " + UsrInfo[1].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("生日 : " + UsrInfo[2].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("身高 : " + UsrInfo[3].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("體重 : " + UsrInfo[4].getText());
+            bw.newLine();
+            bw.newLine();
+            bw.write("SampleRate = 30");
+            bw.newLine();
+            bw.newLine();
+            bw.write("訊號 : ");
+            bw.newLine();
+            bw.newLine();
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+    @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState){
 
         LInflater = inflater;
 
         ppgView = inflater.inflate(R.layout.ppg, container, false);
 
+        G_Graph = ppgView.findViewById(R.id.data_chart);
+
+        fileHandler = new Handler();
+
         appData =new UiDataBundle();
         appData.image_got=0;
 
-        bad_frame_count = 0;
+        frameNum = ppgView.findViewById(R.id.Frame_tv);
+        frameSize = ppgView.findViewById(R.id.Frame_Size_tv);
+        frameAvg = ppgView.findViewById(R.id.AVG_tv);
+
+        fileWriter = null;
+        bw = null;
+
+        dateformat  = new SimpleDateFormat("yyyyMMddHHmmss");
+
+        FilePath = String.valueOf(inflater.getContext().getExternalFilesDir(null)) + "/PPG";
+        f = new File(String.valueOf(FilePath));
+        f.mkdir();
+
+        start_btn = ppgView.findViewById(R.id.Start_btn);
+        start_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ResetGraph();
+                keep_thread_running = true;
+                MYTHREAD();
+                FFTTHREAD();
+                myThread.start();
+                myFFTThread.start();
+                OutputFile();
+            }
+        });
+
+        setUiInfo_btn = ppgView.findViewById(R.id.SetUsrInfo_btn);
+        setUiInfo_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                UsrInfoDialog.show();
+            }
+        });
+
+        dialogView = View.inflate(inflater.getContext(),R.layout.user_info,null);
+
+        UsrInfoDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext())
+                .setTitle("CreatUsrInfo")
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        UsrInfo[0] = UsrInfoDialog.findViewById(R.id.Name_tv);
+                        UsrInfo[1] = UsrInfoDialog.findViewById(R.id.Age_tv);
+                        UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
+                        UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
+                        UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+
+                        if(UsrInfo[0].getText().toString().equals("") || UsrInfo[1].getText().toString().equals("") || UsrInfo[2].getText().toString().equals("") ||
+                                UsrInfo[3].getText().toString().equals("") || UsrInfo[4].getText().toString().equals(""))
+                        {
+                            Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
+                        }
+                        else
+                            setUi(1);
+                    }
+                });
+        UsrInfoDialog = UsrInfoDialog_Builder.create();
+        UsrInfoDialog.setView(dialogView);
+
+
         dataQ = new DoubleTwoDimQueue();
+        bad_frame_count = 0;
         startPointer = 0;
         endPointer = 0;
         fftPoints = 1024;
         image_processed = 0;
         first_fft_run = true;
-        keep_thread_running = true;
+        keep_thread_running = false;
         init_frames_discard = false;
         FPS = 30;
         BPM = 0;
         state_fft = 0;
 
-        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_3_0, inflater.getContext(), mLoaderCallback);
+        imgProcessed = ppgView.findViewById(R.id.AvgBPM_tv);
+
+        timestampQ = new Stack<Long>();
+
+        OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, inflater.getContext(), mLoaderCallback);
 
         mOpenCvCameraView = ppgView.findViewById(R.id.HelloOpenCvView);
         mOpenCvCameraView.setVisibility(SurfaceView.VISIBLE);
@@ -120,14 +386,138 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         mOpenCvCameraView.setMaxFrameSize(300, 300);
         UpdateBPMUi();
 
-
         Log.d("test", "Calling file operations");
 
-//        myThread.start();
-//        myFFTThread.start();
+        setUi(0);
 
         return ppgView;
     }
+    private void FFTTHREAD()
+    {
+        myFFTThread = new Thread(){
+            @Override
+            public void run(){
+                while(keep_thread_running){
+                    if (start_fft == false){
+
+                        //Sleeping part may lead to timing problems
+                        Log.d("test" + "FFT Thread","Start FFT is not set");
+                        try {
+                            Thread.sleep(100);
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+                    }
+
+                    else {
+
+                        Log.d("test" + "FFT Started", "Clearing the variable");
+                        start_fft = false;
+
+                        double[][] sample_arr = new double[fftPoints][2];
+                        double[]   input_arr = new double[fftPoints];
+                        double[] freq_arr = new double[fftPoints];
+                        fftLib f = new fftLib();
+
+                        Log.d("test","StartPointer = " + startPointer + " EndPointer = " + endPointer);
+                        sample_arr = dataQ.toArray(startPointer, endPointer);
+                        input_arr = dataQ.toArray(startPointer, endPointer, 0);
+
+                        long timeStart  = timestampQ.get(startPointer);
+                        long timeEnd    = timestampQ.get(endPointer);
+
+                        if((((int)(timeEnd - timestampQ.get(0)))/1000)/60 == 5)
+                            Flag = true;
+
+                        //Log.d("Time", String.valueOf((((int)(timeEnd - timestampQ.get(0)))/1000)/60));
+
+                        FPS =  (fftPoints * 1000)/ (int)(timeEnd - timeStart) ;
+                        Log.d("test","FPS Calculated = " + FPS);
+
+                        freq_arr = f.fft_energy_squared(sample_arr, fftPoints);
+
+
+                        Log.d("FFT OUT : ", Arrays.toString(freq_arr));
+                        Log.d("Data points : ", input_arr.length + "");
+                        Log.d("Data points : ", Arrays.toString(input_arr));
+
+                        double factor = fftPoints / FPS;          // (N / Fs)
+                        double nMinFactor = 0.75;                 // The frequency corresponding to 45bpm
+                        double nMaxFactor = 2.5;                  // The frequency corresponding to 150bpm
+
+                        int nMin = (int) Math.floor(nMinFactor * factor);
+                        int nMax = (int) Math.ceil(nMaxFactor * factor);
+
+                        double max = freq_arr[nMin];
+                        int pos = nMin;
+                        for(int i =nMin; i <= nMax; i++){
+                            if (freq_arr[i] > max) {
+                                max = freq_arr[i];
+                                pos = i;
+                            }
+                        }
+
+                        double bps = pos / factor;      //Calculate the freq
+                        double bpm = 60.0 * bps;        //Calculate bpm
+                        BPM = Math.round(bpm);
+                        Log.d("test"+" FFT Thread", "MAX = " + max + " pos = " + pos);
+                    }
+                }
+            }
+        };
+    }
+    private void MYTHREAD()
+    {
+        myThread = new Thread(){
+            @Override
+            public void run(){
+                while (appData.image_got <= 0) {
+                    Log.d("test", "Waiting for image");
+                    try {
+                        Thread.sleep(1000);
+                    }catch (Exception e){
+                        e.printStackTrace();
+                    }
+                }
+                int image_got_local = -1;
+
+                mOpenCvCameraView.turnFlashOn();
+                mOpenCvCameraView.setFrameRate(30000, 30000);           //We are trying to get 30FPS constant rate
+                while(keep_thread_running){
+
+                    //We will wait till a new frame is received
+                    while(image_got_local == appData.image_got){
+                        //Sleeping part may lead to timing problems
+                        try {
+                            Thread.sleep(11);
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+                    }
+
+                    appData.frameSz = myInputFrame.size();
+
+                    ArrayList<Mat> img_comp = new ArrayList<Mat>(3);
+                    Core.split(myInputFrame, img_comp);
+
+
+                    //Trying with the green component instead : Cheking
+                    Mat myMat = img_comp.get(0);
+
+
+                    appData.frameAv = getMatAvg(myMat);
+
+                    //We cannot access UI objects from background threads, hence need to pass this data to UI thread
+                    Message uiMessage = mHandler.obtainMessage(1,appData);
+                    uiMessage.sendToTarget();
+
+                    handleInputData(appData.frameAv);
+                    image_got_local = appData.image_got;
+                }
+            }
+        };
+    }
+
     @Override
     public void onCameraViewStarted(int width, int height) {
 
@@ -140,9 +530,13 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        appData.image_got++;
         myInputFrame = inputFrame.rgba();
-//        timestampQ.push((Long)System.currentTimeMillis());
+        if(keep_thread_running) {
+            appData.image_got++;
+            //myInputFrame = inputFrame.rgba();
+            timestampQ.push((Long) System.currentTimeMillis());
+            //UpdateGraph();
+        }
         return myInputFrame;
     }
 
@@ -180,18 +574,20 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
             state = 1;
         }
 
-        queueData[0][0] = data;
+        queueData[0][0] = 255 - data;
         queueData[0][1] = 0.0;
 
         switch (state){
             case 0:
                 bad_frame_count = 0;
                 image_processed++;
+                UpdateGraph(255.0 - data);
                 dataQ.Qpush(queueData);
                 break;
             case 1:
                 ++bad_frame_count;
                 image_processed++;
+                UpdateGraph(255.0 - data);
                 dataQ.Qpush(queueData);
 
                 if(bad_frame_count > 5){
@@ -255,144 +651,4 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
             }
         }
     }
-    Thread myThread = new Thread(){
-        @Override
-        public void run(){
-            while (appData.image_got <= 0) {
-                Log.d("test", "Waiting for image");
-                try {
-                    Thread.sleep(1000);
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
-            int image_got_local = -1;
-//            mOpenCvCameraView.turnFlashOn();
-//            mOpenCvCameraView.setFrameRate(30000, 30000);           //We are trying to get 30FPS constant rate
-            while(keep_thread_running){
-
-                //We will wait till a new frame is received
-                while(image_got_local == appData.image_got){
-                    //Sleeping part may lead to timing problems
-                    try {
-                        Thread.sleep(11);
-                    }catch (Exception e){
-                        e.printStackTrace();
-                    }
-                }
-
-                appData.frameSz = myInputFrame.size();
-
-                ArrayList<Mat> img_comp = new ArrayList<Mat>(3);
-                Core.split(myInputFrame, img_comp);
-
-                //Get the red component of the image
-                //Mat myMat = img_comp.get(0);
-
-                //Trying with the green component instead : Cheking
-                Mat myMat = img_comp.get(0);
-
-
-                appData.frameAv = getMatAvg(myMat);
-
-                //We cannot access UI objects from background threads, hence need to pass this data to UI thread
-                Message uiMessage = mHandler.obtainMessage(1,appData);
-                uiMessage.sendToTarget();
-
-                handleInputData(appData.frameAv);
-                image_got_local = appData.image_got;
-            }
-        }
-    };
-    Thread myFFTThread = new Thread(){
-        @Override
-        public void run(){
-            while(keep_thread_running){
-                if (start_fft == false){
-
-                    //Sleeping part may lead to timing problems
-                    Log.d("test" + "FFT Thread","Start FFT is not set");
-                    try {
-                        Thread.sleep(100);
-                    }catch (Exception e){
-                        e.printStackTrace();
-                    }
-                }
-
-                else {
-
-                    Log.d("test" + "FFT Started", "Clearing the variable");
-                    start_fft = false;
-
-                    double[][] sample_arr = new double[fftPoints][2];
-                    double[]   input_arr = new double[fftPoints];
-                    double[] freq_arr = new double[fftPoints];
-                    fftLib f = new fftLib();
-
-                    Log.d("test","StartPointer = " + startPointer + " EndPointer = " + endPointer);
-                    sample_arr = dataQ.toArray(startPointer, endPointer);
-                    input_arr = dataQ.toArray(startPointer, endPointer, 0);
-
-                    long timeStart  = timestampQ.get(startPointer);
-                    long timeEnd    = timestampQ.get(endPointer);
-
-                    FPS =  (fftPoints * 1000)/ (int)(timeEnd - timeStart) ;
-                    Log.d("test","FPS Calculated = " + FPS);
-
-                    freq_arr = f.fft_energy_squared(sample_arr, fftPoints);
-
-
-                    Log.d("FFT OUT : ", Arrays.toString(freq_arr));
-                    Log.d("Data points : ", input_arr.length + "");
-                    Log.d("Data points : ", Arrays.toString(input_arr));
-
-                    try {
-                        fileWriter = new FileWriter(LInflater.getContext().getExternalFilesDir(null)+ "/data.txt",false);
-                        BufferedWriter bw = new BufferedWriter(fileWriter);
-                        bw.write(Arrays.toString(dataQ.toArray(0, endPointer, 0)));
-                        //bw.write(Arrays.toString(input_arr));
-                        bw.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-
-                    /*
-                    try {
-                        fileWriter = openFileOutput("fftOut.csv",MODE_APPEND|MODE_WORLD_READABLE);
-                        fileWriter.write(Arrays.toString(freq_arr).getBytes());
-                        fileWriter.close();
-                        Log.d("test", getFileStreamPath("fftout.csv").toString());
-
-                        fileWriter = openFileOutput("dataPoints.csv",MODE_APPEND|MODE_WORLD_READABLE);
-                        fileWriter.write(Arrays.toString(sample_arr).getBytes());
-                        fileWriter.close();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    */
-
-                    double factor = fftPoints / FPS;          // (N / Fs)
-                    double nMinFactor = 0.75;                 // The frequency corresponding to 45bpm
-                    double nMaxFactor = 2.5;                  // The frequency corresponding to 150bpm
-
-                    int nMin = (int) Math.floor(nMinFactor * factor);
-                    int nMax = (int) Math.ceil(nMaxFactor * factor);
-
-                    double max = freq_arr[nMin];
-                    int pos = nMin;
-                    for(int i =nMin; i <= nMax; i++){
-                        if (freq_arr[i] > max) {
-                            max = freq_arr[i];
-                            pos = i;
-                        }
-                    }
-
-                    double bps = pos / factor;      //Calculate the freq
-                    double bpm = 60.0 * bps;        //Calculate bpm
-                    BPM = Math.round(bpm);
-                    Log.d("test"+" FFT Thread", "MAX = " + max + " pos = " + pos);
-                }
-            }
-        }
-    };
 }
