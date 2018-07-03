@@ -7,6 +7,7 @@ import android.app.Fragment;
 import android.app.Service;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.database.Cursor;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -25,9 +26,12 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +50,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.LinkedList;
@@ -125,6 +130,39 @@ public class GsrView extends Fragment{
     private double MeanGsrValue = 0.0;
     private double TempMeanGsrValue = 0.0;
 
+    private MyDBHelper myDBHelper;
+
+    private Spinner mySpinner;
+    private ArrayAdapter<String> usrInfo_Adapter;
+    private ArrayList<String> usrInfo_Array;
+
+    private Cursor cursor;
+
+    private String SpinnerSelected;
+
+    private Handler DBHandler;
+
+    private void updateDB()
+    {
+        DBHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+
+                usrInfo_Array.clear();
+
+                cursor = myDBHelper.query();
+
+                if (cursor.moveToFirst()) {
+                    usrInfo_Array.add(cursor.getString(1));
+
+                    while (cursor.moveToNext())
+                        usrInfo_Array.add(cursor.getString(1));
+                }
+                DBHandler.postDelayed(this, 500);
+
+            }
+        },500);
+    }
     @RequiresApi(api = Build.VERSION_CODES.M)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
 
@@ -151,6 +189,12 @@ public class GsrView extends Fragment{
 
         UsrInfoDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext())
                 .setTitle("CreatUsrInfo")
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                })
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
@@ -165,12 +209,82 @@ public class GsrView extends Fragment{
                 {
                     Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
                 }
-                else
+                else {
+                    myDBHelper.insert(UsrInfo[0].getText().toString(),UsrInfo[1].getText().toString(),
+                            UsrInfo[2].getText().toString(),UsrInfo[3].getText().toString(),
+                            UsrInfo[4].getText().toString());
+
+                    usrInfo_Array.add(UsrInfo[0].getText().toString());
+                    Toast.makeText(inflater.getContext(),"設定完成",Toast.LENGTH_SHORT).show();
                     setEnabledUi(2);
+                }
             }
         });
         UsrInfoDialog = UsrInfoDialog_Builder.create();
         UsrInfoDialog.setView(dialogView);
+
+        DBHandler = new Handler();
+        myDBHelper = new MyDBHelper(inflater.getContext());
+
+        cursor = myDBHelper.query();
+        usrInfo_Array = new ArrayList<String>();
+
+        cursor = myDBHelper.query();
+        if (cursor.moveToFirst()) {
+            usrInfo_Array.add(cursor.getString(1));
+
+            while (cursor.moveToNext())
+                usrInfo_Array.add(cursor.getString(1));
+        }
+        updateDB();
+
+        usrInfo_Adapter = new ArrayAdapter<String>(inflater.getContext(),R.layout.usr_spinner,R.id.spinner_tv,usrInfo_Array);
+
+        mySpinner = dialogView.findViewById(R.id.usrSpinner);
+        mySpinner.setAdapter(usrInfo_Adapter);
+        mySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                SpinnerSelected = parent.getSelectedItem().toString();
+
+                cursor = myDBHelper.query();
+                cursor.moveToFirst();
+
+                String temp = cursor.getString(1);
+
+                UsrInfo[0] = UsrInfoDialog.findViewById(R.id.Name_tv);
+                UsrInfo[1] = UsrInfoDialog.findViewById(R.id.Age_tv);
+                UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
+                UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
+                UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+
+                if(temp.equals(SpinnerSelected)){
+                    UsrInfo[0].setText(cursor.getString(1));
+                    UsrInfo[1].setText(cursor.getString(2));
+                    UsrInfo[2].setText(cursor.getString(3));
+                    UsrInfo[3].setText(cursor.getString(4));
+                    UsrInfo[4].setText(cursor.getString(5));
+                }else {
+                    while (cursor.moveToNext()) {
+                        temp = cursor.getString(1);
+                        if (temp.equals(SpinnerSelected)) {
+                            UsrInfo[0].setText(cursor.getString(1));
+                            UsrInfo[1].setText(cursor.getString(2));
+                            UsrInfo[2].setText(cursor.getString(3));
+                            UsrInfo[3].setText(cursor.getString(4));
+                            UsrInfo[4].setText(cursor.getString(5));
+                            break;
+                        }
+
+                    }
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
 
 //        TimeDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext());
 //        TimeDialog = TimeDialog_Builder.create();
@@ -328,7 +442,7 @@ public class GsrView extends Fragment{
                     Toast.makeText(inflater.getContext(),"尚未接觸皮膚量測，請接觸皮膚重新量測",Toast.LENGTH_SHORT).show();
                     TempMeanGsrValue = 0.0;
                 }
-                GsrValue_tv.setText(new String(String.valueOf(MeanGsrValue)));
+                GsrValue_tv.setText(new String(String.valueOf(String.format("%.2f",MeanGsrValue)) + "M"));
                 Update_GsrValue.post(this);
             }
         });
@@ -432,6 +546,7 @@ public class GsrView extends Fragment{
                         MeanGsrValue = 0.0;
                         c = Calendar.getInstance();
                         fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
+                        //fileWriter[counter] = new FileWriter(FilePath + "/" + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
                         bw[counter] = new BufferedWriter(fileWriter[counter]);
                         SetFileHeader(bw[counter]);
 
@@ -447,6 +562,7 @@ public class GsrView extends Fragment{
                             bw[counter].write(new String(String.valueOf(data + data2)) + " , ");
                         }
                         MeanGsrValue = MeanGsrValue / Double.parseDouble(selectSampleRate);
+                        MeanGsrValue = (1024+2*MeanGsrValue)/(512-MeanGsrValue)/10;
                         TempMeanGsrValue = MeanGsrValue;
                         bw[counter].write(" ]");
                         bw[counter].close();

@@ -4,6 +4,9 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
 import android.content.DialogInterface;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
 import android.graphics.Color;
 import android.hardware.Camera;
 import android.os.Build;
@@ -19,7 +22,10 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.hardware.camera2.*;
 import android.widget.Toast;
@@ -58,6 +64,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     private Handler mHandler;
     private Handler fileHandler;
+    private Handler DBHandler;
 
     private LayoutInflater LInflater;
 
@@ -116,6 +123,18 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private Thread myThread;
     private Thread myFFTThread;
 
+    private MyDBHelper myDBHelper;
+
+    private Spinner mySpinner;
+    private ArrayAdapter<String> usrInfo_Adapter;
+    private ArrayList<String> usrInfo_Array;
+
+    private Cursor cursor;
+
+    private String SpinnerSelected;
+
+    private int DBCount = 0;
+
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(getActivity()) {
         @Override
@@ -165,7 +184,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 G_Series.appendData(new DataPoint(mXPoint,value), true, 10000);
                 G_Graph.getViewport().setMaxX(mXPoint);
                 //G_Graph.getViewport().setMinX(0);
-                G_Graph.getViewport().setMinX(mXPoint - 100);
+                G_Graph.getViewport().setMinX(mXPoint - 50);
                 mXPoint += 1;
                 //G_Graph.postDelayed(this,50);
             }
@@ -221,6 +240,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                                 .show();
                         c = Calendar.getInstance();
                         fileWriter = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + ".txt",false);
+                        //fileWriter = new FileWriter(FilePath + "/" + UsrInfo[0].getText() + ".txt",false);
                         bw = new BufferedWriter(fileWriter);
                         SetFileHeader(bw);
                         bw.write(Arrays.toString(dataQ.toArray(0, endPointer, 0)));
@@ -286,6 +306,26 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
             e.printStackTrace();
         }
     }
+    private void updateDB()
+    {
+        DBHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                usrInfo_Array.clear();
+
+                cursor = myDBHelper.query();
+
+                if (cursor.moveToFirst()) {
+                    usrInfo_Array.add(cursor.getString(1));
+
+                    while (cursor.moveToNext())
+                        usrInfo_Array.add(cursor.getString(1));
+                }
+                DBHandler.postDelayed(this, 500);
+
+            }
+        },500);
+    }
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState){
 
@@ -307,6 +347,23 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         fileWriter = null;
         bw = null;
 
+        myDBHelper = new MyDBHelper(inflater.getContext());
+//        myDBHelper.insert("Name3","23","24","25","26");
+//        myDBHelper.insert("Name4","12","13","14","15");
+//        Cursor cursor = myDBHelper.query();
+//        cursor.moveToLast();
+//        StringBuilder stringBuilder = new StringBuilder();
+//        stringBuilder.append(cursor.getString(1)+"\n"+
+//                             cursor.getString(2)+"\n"+
+//                             cursor.getString(3)+"\n"+
+//                             cursor.getString(4)+"\n"+
+//                             cursor.getString(5)+"\n");
+//        while(cursor.moveToNext()){
+//            stringBuilder.append(cursor.getString(1)+"\n");
+//        };
+//
+//        Toast.makeText(inflater.getContext(),stringBuilder , Toast.LENGTH_SHORT).show();
+//        cursor.close();
         dateformat  = new SimpleDateFormat("yyyyMMddHHmmss");
 
         FilePath = String.valueOf(inflater.getContext().getExternalFilesDir(null)) + "/PPG";
@@ -339,6 +396,12 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
         UsrInfoDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext())
                 .setTitle("CreatUsrInfo")
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                })
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -353,12 +416,83 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         {
                             Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
                         }
-                        else
+                        else {
+                            myDBHelper.insert(UsrInfo[0].getText().toString(),UsrInfo[1].getText().toString(),
+                                    UsrInfo[2].getText().toString(),UsrInfo[3].getText().toString(),
+                                    UsrInfo[4].getText().toString());
+
+                            usrInfo_Array.add(UsrInfo[0].getText().toString());
+                            Toast.makeText(inflater.getContext(),"設定完成",Toast.LENGTH_SHORT).show();
                             setUi(1);
+                        }
                     }
                 });
         UsrInfoDialog = UsrInfoDialog_Builder.create();
         UsrInfoDialog.setView(dialogView);
+
+        DBHandler = new Handler();
+
+        usrInfo_Array = new ArrayList<String>();
+
+        myDBHelper.deleteAll();
+        myDBHelper.insert("預設","預設","預設","預設","預設");
+        cursor = myDBHelper.query();
+
+        if (cursor.moveToFirst()) {
+            usrInfo_Array.add(cursor.getString(1));
+
+            while (cursor.moveToNext())
+                usrInfo_Array.add(cursor.getString(1));
+        }
+
+        usrInfo_Adapter = new ArrayAdapter<String>(inflater.getContext(),R.layout.usr_spinner,R.id.spinner_tv,usrInfo_Array);
+
+        mySpinner = dialogView.findViewById(R.id.usrSpinner);
+        mySpinner.setAdapter(usrInfo_Adapter);
+        mySpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                SpinnerSelected = parent.getSelectedItem().toString();
+
+                cursor = myDBHelper.query();
+                cursor.moveToFirst();
+
+                String temp = cursor.getString(1);
+
+                UsrInfo[0] = UsrInfoDialog.findViewById(R.id.Name_tv);
+                UsrInfo[1] = UsrInfoDialog.findViewById(R.id.Age_tv);
+                UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
+                UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
+                UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+
+                if(temp.equals(SpinnerSelected)){
+                    UsrInfo[0].setText(cursor.getString(1));
+                    UsrInfo[1].setText(cursor.getString(2));
+                    UsrInfo[2].setText(cursor.getString(3));
+                    UsrInfo[3].setText(cursor.getString(4));
+                    UsrInfo[4].setText(cursor.getString(5));
+                }else {
+                    while (cursor.moveToNext()) {
+                        temp = cursor.getString(1);
+                        if (temp.equals(SpinnerSelected)) {
+                            UsrInfo[0].setText(cursor.getString(1));
+                            UsrInfo[1].setText(cursor.getString(2));
+                            UsrInfo[2].setText(cursor.getString(3));
+                            UsrInfo[3].setText(cursor.getString(4));
+                            UsrInfo[4].setText(cursor.getString(5));
+                            break;
+                        }
+
+                    }
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
 
 
         dataQ = new DoubleTwoDimQueue();
@@ -390,6 +524,8 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
         setUi(0);
 
+        updateDB();
+
         return ppgView;
     }
     private void FFTTHREAD()
@@ -408,7 +544,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                             e.printStackTrace();
                         }
                     }
-
                     else {
 
                         Log.d("test" + "FFT Started", "Clearing the variable");
