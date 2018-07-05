@@ -93,10 +93,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     private TextView imgProcessed;
 
-    private TextView frameNum;
-    private TextView frameSize;
-    private TextView frameAvg;
-
     private Button start_btn;
     private Button setUiInfo_btn;
 
@@ -133,7 +129,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     private String SpinnerSelected;
 
-    private int DBCount = 0;
+    private int AVGFailCount = 0;
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(getActivity()) {
@@ -159,11 +155,17 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
             public void handleMessage(Message inputMessage){
                 UiDataBundle incoming = (UiDataBundle) inputMessage.obj;
 
-                frameNum.setText("" + incoming.image_got);
-                frameSize.setText("" + incoming.frameSz);
                 int avg = (int) Math.round(incoming.frameAv);
-                frameAvg.setText("" + (255 - avg));
 
+                if((255 - avg) < 20 || (255 - avg) > 90)
+                    AVGFailCount++;
+
+                if(AVGFailCount >= 20){
+                    keep_thread_running = false;
+                    VarReset();
+                    AVGFailCount = 0;
+                    Toast.makeText(LInflater.getContext(),"請確實將手指放好量測，並重新按 Start",Toast.LENGTH_SHORT).show();
+                }
 
                 if(BPM > 0) {
                     if(fftPoints < 1024){
@@ -340,10 +342,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         appData =new UiDataBundle();
         appData.image_got=0;
 
-        frameNum = ppgView.findViewById(R.id.Frame_tv);
-        frameSize = ppgView.findViewById(R.id.Frame_Size_tv);
-        frameAvg = ppgView.findViewById(R.id.AVG_tv);
-
         fileWriter = null;
         bw = null;
 
@@ -434,8 +432,8 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
         usrInfo_Array = new ArrayList<String>();
 
-        myDBHelper.deleteAll();
-        myDBHelper.insert("預設","預設","預設","預設","預設");
+        //myDBHelper.deleteAll();
+        //myDBHelper.insert("預設","23","19910123","170","70");
         cursor = myDBHelper.query();
 
         if (cursor.moveToFirst()) {
@@ -492,8 +490,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
             }
         });
-
-
 
         dataQ = new DoubleTwoDimQueue();
         bad_frame_count = 0;
@@ -561,7 +557,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         long timeStart  = timestampQ.get(startPointer);
                         long timeEnd    = timestampQ.get(endPointer);
 
-                        if((((int)(timeEnd - timestampQ.get(0)))/1000)/60 == 5)
+                        if((((int)(timeEnd - timestampQ.get(0)))/1000)/60 == 1)
                             Flag = true;
 
                         //Log.d("Time", String.valueOf((((int)(timeEnd - timestampQ.get(0)))/1000)/60));

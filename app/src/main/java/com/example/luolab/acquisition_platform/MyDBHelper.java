@@ -5,6 +5,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
 public class MyDBHelper extends SQLiteOpenHelper {
 
@@ -47,10 +48,12 @@ public class MyDBHelper extends SQLiteOpenHelper {
     }
 
     public Cursor query(){
+        Cursor cursor = database.rawQuery("SELECT * FROM my_db", null);
+        cursor.moveToFirst();
+        //Log.d("asd",cursor.getCount() + "");
+        if(cursor.getCount() == 0)
+            insert("預設","23","19910123","170","70");
         return database.rawQuery("SELECT * FROM my_db", null);
-    }
-    public void delete(String Name){
-        database.execSQL("delete from " + TABLE_NAME);
     }
     public void deleteAll(){
         database.delete(TABLE_NAME,null,null);

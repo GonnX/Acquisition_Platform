@@ -4,11 +4,18 @@ import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Fragment;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.database.Cursor;
 import android.graphics.drawable.Drawable;
+import android.hardware.usb.UsbDevice;
+import android.hardware.usb.UsbDeviceConnection;
+import android.hardware.usb.UsbManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
@@ -26,6 +33,7 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -35,6 +43,8 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.felhr.usbserial.UsbSerialDevice;
+import com.felhr.usbserial.UsbSerialInterface;
 import com.physicaloid.lib.Physicaloid;
 import com.physicaloid.lib.usb.driver.uart.ReadLisener;
 
@@ -49,13 +59,17 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.zip.Inflater;
 
 public class GsrView extends Fragment{
 
@@ -74,7 +88,6 @@ public class GsrView extends Fragment{
     private View gsrView;
 
     private Object[] imageResource;
-    private Physicaloid mPhysicaloid;
 
     private boolean startFlag;
 
@@ -142,6 +155,76 @@ public class GsrView extends Fragment{
 
     private Handler DBHandler;
 
+    private boolean SerialFlag = false;
+
+    private LayoutInflater G_Inflater;
+
+    public final String ACTION_USB_PERMISSION = "com.hariharan.arduinousb.USB_PERMISSION";
+    UsbManager usbManager;
+    UsbDevice device;
+    UsbSerialDevice serialPort;
+    UsbDeviceConnection connection;
+
+    UsbSerialInterface.UsbReadCallback mCallback = new UsbSerialInterface.UsbReadCallback() { //Defining a Callback which triggers whenever data is read.
+        @Override
+        public void onReceivedData(byte[] arg0) {
+            SetChoice(arg0,arg0.length,G_Inflater);
+        }
+    };
+
+    private final BroadcastReceiver broadcastReceiver = new BroadcastReceiver() { //Broadcast Receiver to automatically start and stop the Serial connection.
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(ACTION_USB_PERMISSION)) {
+                boolean granted = intent.getExtras().getBoolean(UsbManager.EXTRA_PERMISSION_GRANTED);
+                if (granted) {
+                    connection = usbManager.openDevice(device);
+                    serialPort = UsbSerialDevice.createUsbSerialDevice(device, connection);
+                    if (serialPort != null) {
+                        if (serialPort.open()) { //Set Serial Connection Parameters.
+                            serialPort.setBaudRate(9600);
+                            serialPort.setDataBits(UsbSerialInterface.DATA_BITS_8);
+                            serialPort.setStopBits(UsbSerialInterface.STOP_BITS_1);
+                            serialPort.setParity(UsbSerialInterface.PARITY_NONE);
+                            serialPort.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
+                            serialPort.read(mCallback);
+                            Toast.makeText(G_Inflater.getContext(),"Serial Connection Opened!",Toast.LENGTH_SHORT).show();
+                        } else {
+                            Log.d("SERIAL", "PORT NOT OPEN");
+                        }
+                    } else {
+                        Log.d("SERIAL", "PORT IS NULL");
+                    }
+                } else {
+                    Log.d("SERIAL", "PERM NOT GRANTED");
+                }
+            } else if (intent.getAction().equals(UsbManager.ACTION_USB_DEVICE_ATTACHED)) {
+                onClickStart();
+            }
+        };
+    };
+    private void onClickStart(){
+        HashMap<String, UsbDevice> usbDevices = usbManager.getDeviceList();
+        if (!usbDevices.isEmpty()) {
+            boolean keep = true;
+            for (Map.Entry<String, UsbDevice> entry : usbDevices.entrySet()) {
+                device = entry.getValue();
+                int deviceVID = device.getVendorId();
+                if (deviceVID == 0x2341)//Arduino Vendor ID
+                {
+                    PendingIntent pi = PendingIntent.getBroadcast(G_Inflater.getContext(), 0, new Intent(ACTION_USB_PERMISSION), 0);
+                    usbManager.requestPermission(device, pi);
+                    keep = false;
+                } else {
+                    connection = null;
+                    device = null;
+                }
+
+                if (!keep)
+                    break;
+            }
+        }
+    }
     private void updateDB()
     {
         DBHandler.postDelayed(new Runnable() {
@@ -171,6 +254,15 @@ public class GsrView extends Fragment{
         G_Graph = gsrView.findViewById(R.id.data_chart);
 
         ResetGraph();
+
+        G_Inflater = inflater;
+
+        usbManager = (UsbManager) inflater.getContext().getSystemService(inflater.getContext().USB_SERVICE);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_USB_PERMISSION);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED);
+        filter.addAction(UsbManager.ACTION_USB_DEVICE_DETACHED);
+        inflater.getContext().registerReceiver(broadcastReceiver, filter);
 
         acupointImage = gsrView.findViewById(R.id.Gsr_ImageView);
 
@@ -313,16 +405,6 @@ public class GsrView extends Fragment{
 
         //CheckFileExists(inflater);
 
-        mPhysicaloid = new Physicaloid((Activity)inflater.getContext());
-        mPhysicaloid.open();
-//        try {
-//            if (mPhysicaloid.open()) {
-//                Toast.makeText(inflater.getContext(), "open", Toast.LENGTH_SHORT).show();
-//            }
-//        }
-//        catch(Exception io){
-//            Toast.makeText(inflater.getContext(),"error",Toast.LENGTH_SHORT).show();
-//        }
         startBtn = gsrView.findViewById(R.id.start_btn);
         startBtn.setOnClickListener(new View.OnClickListener() {
             @TargetApi(Build.VERSION_CODES.M)
@@ -391,8 +473,6 @@ public class GsrView extends Fragment{
                             public void onClick(DialogInterface dialog, int which) {
                                 if(selectSampleRate != null) {
                                     setEnabledUi(0);
-                                    if (!startFlag)
-                                        setSerialOpen(inflater);
                                 }
                             }
                         })
@@ -418,6 +498,7 @@ public class GsrView extends Fragment{
 
         setEnabledUi(1);
         UpdateGsrValue(inflater);
+        onClickStart();
 
         return gsrView;
     }
@@ -562,8 +643,8 @@ public class GsrView extends Fragment{
                             bw[counter].write(new String(String.valueOf(data + data2)) + " , ");
                         }
                         MeanGsrValue = MeanGsrValue / Double.parseDouble(selectSampleRate);
-                        MeanGsrValue = (1024+2*MeanGsrValue)/(512-MeanGsrValue)/10;
                         TempMeanGsrValue = MeanGsrValue;
+                        MeanGsrValue = (1024+2*MeanGsrValue)/(512-MeanGsrValue)/10;
                         bw[counter].write(" ]");
                         bw[counter].close();
                         FileFlag = false;
@@ -702,24 +783,21 @@ public class GsrView extends Fragment{
             setSampleRateBtn.setEnabled(true);
             setUsrInfoBtn.setEnabled(true);
         }
-//        else if(state == 3){
-//            startBtn.setEnabled(false);
-//            backBtn.setEnabled(true);
-//            setSampleRateBtn.setEnabled(false);
-//        }
     }
     private void setSerialOpen(final LayoutInflater inflater) {
-        if (mPhysicaloid.open()) {
+
             Toast.makeText(inflater.getContext(), "open", Toast.LENGTH_SHORT).show();
-            mPhysicaloid.addReadListener(new ReadLisener() {
-                @Override
-                public void onRead(int size) {
-                    byte[] buf = new byte[size];
-                    mPhysicaloid.read(buf, size);
-                    SetChoice(buf,size,inflater);
-                }
-            });
-        }
+//            mPhysicaloid.addReadListener(new ReadLisener() {
+//                @Override
+//                public void onRead(int size) {
+//                    //Toast.makeText(inflater.getContext(), "Read", Toast.LENGTH_SHORT).show();
+//                    byte[] buf = new byte[size];
+//                    mPhysicaloid.read(buf, size);
+//                    tvAppend(tvRead, new String(buf));
+//                    SetChoice(buf,size,inflater);
+//                }
+//            });
+
     }
 
     private boolean isEmpty()
@@ -741,24 +819,24 @@ public class GsrView extends Fragment{
         return SerialData_Queue[Queue_Index_Front++];
     }
     private void SetChoice(byte[] buf,int size,LayoutInflater inflater){
-        if(size == 1){
-            if(buf[0] == 'B')
-                BackBtn_Click(inflater);
-            else if(buf[0] == 'S') {
-                ResetGraph();
-                StartBtn_Click(inflater);
-            }
-            else if(buf[0] == 'N')
-                NextBtn_Click(inflater);
-            else {
-                PushSerialData(buf, size);
-                UpdateGraph(size,inflater);
-            }
-        }
-        else {
+//        if(size == 1){
+//            if(buf[0] == 'B')
+//                BackBtn_Click(inflater);
+//            else if(buf[0] == 'S') {
+//                ResetGraph();
+//                StartBtn_Click(inflater);
+//            }
+//            else if(buf[0] == 'N')
+//                NextBtn_Click(inflater);
+//            else {
+//                PushSerialData(buf, size);
+//                UpdateGraph(size,inflater);
+//            }
+//        }
+//        else {
             PushSerialData(buf,size);
             UpdateGraph(size,inflater);
-        }
+        //}
     }
     private void StartBtn_Click(LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
@@ -770,7 +848,8 @@ public class GsrView extends Fragment{
             Data[0] = 0x31;
         else
             Data[0] = 0x32;
-        mPhysicaloid.write(Data, Data.length);
+
+        serialPort.write(Data);
     }
     private void NextBtn_Click(LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
