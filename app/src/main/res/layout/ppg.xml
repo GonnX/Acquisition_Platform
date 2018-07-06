@@ -15,7 +15,7 @@
     <LinearLayout
         android:id="@+id/show_carema_Layout"
         android:layout_width="match_parent"
-        android:layout_height="187dp"
+        android:layout_height="160dp"
         android:layout_marginBottom="5dp"
         android:layout_marginLeft="20dp"
         android:layout_marginRight="20dp"
@@ -56,12 +56,22 @@
             android:layout_weight="1"
             android:background="@drawable/show_image"
             android:text="SetUsrInfo"/>
+
     </LinearLayout>
+
+    <Button
+        android:id="@+id/Optional_btn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="10dp"
+        android:layout_marginRight="10dp"
+        android:background="@drawable/show_image"
+        android:text="Menu"/>
 
     <com.jjoe64.graphview.GraphView
         android:id="@+id/data_chart"
         android:layout_width="match_parent"
-        android:layout_height="150dp"
+        android:layout_height="168dp"
         android:layout_marginTop="5dp"/>
 
     <LinearLayout

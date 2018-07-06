@@ -188,7 +188,8 @@ public class GsrView extends Fragment{
                             serialPort.setParity(UsbSerialInterface.PARITY_NONE);
                             serialPort.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
                             serialPort.read(mCallback);
-                            Toast.makeText(G_Inflater.getContext(),"Serial Connection Opened!",Toast.LENGTH_SHORT).show();
+                            SerialFlag = true;
+                            setEnabledUi(0);
                         } else {
                             Log.d("SERIAL", "PORT NOT OPEN");
                         }
@@ -471,9 +472,9 @@ public class GsrView extends Fragment{
                         .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-                                if(selectSampleRate != null) {
-                                    setEnabledUi(0);
-                                }
+//                                if(selectSampleRate != null && SerialFlag != false) {
+//                                    setEnabledUi(0);
+//                                }
                             }
                         })
                         .setSingleChoiceItems(sampleRate_Item, -1, new DialogInterface.OnClickListener() {
@@ -499,7 +500,6 @@ public class GsrView extends Fragment{
         setEnabledUi(1);
         UpdateGsrValue(inflater);
         onClickStart();
-
         return gsrView;
     }
 //    private void CheckFileExists(LayoutInflater inflater)
@@ -626,8 +626,8 @@ public class GsrView extends Fragment{
                     try{
                         MeanGsrValue = 0.0;
                         c = Calendar.getInstance();
-                        fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
-                        //fileWriter[counter] = new FileWriter(FilePath + "/" + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
+                        //fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
+                        fileWriter[counter] = new FileWriter(FilePath + "/" + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
                         bw[counter] = new BufferedWriter(fileWriter[counter]);
                         SetFileHeader(bw[counter]);
 

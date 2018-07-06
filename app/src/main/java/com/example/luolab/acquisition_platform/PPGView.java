@@ -95,15 +95,20 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     private Button start_btn;
     private Button setUiInfo_btn;
+    private Button menu_btn;
 
     private boolean Flag = false;
 
     private View dialogView;
+    private View menu_dialogView;
 
     private TextView[] UsrInfo = new TextView[5];
 
     private AlertDialog.Builder UsrInfoDialog_Builder;
     private AlertDialog UsrInfoDialog;
+
+    private AlertDialog.Builder MenuDialog_Builder;
+    private AlertDialog MenuDialog;
 
     private GraphView G_Graph;
     private LineGraphSeries<DataPoint> G_Series;
@@ -130,6 +135,9 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private String SpinnerSelected;
 
     private int AVGFailCount = 0;
+
+    private int PPGTime = 5;
+    private int Scale = 100;
 
     @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
     BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(getActivity()) {
@@ -186,7 +194,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 G_Series.appendData(new DataPoint(mXPoint,value), true, 10000);
                 G_Graph.getViewport().setMaxX(mXPoint);
                 //G_Graph.getViewport().setMinX(0);
-                G_Graph.getViewport().setMinX(mXPoint - 50);
+                G_Graph.getViewport().setMinX(mXPoint - Scale);
                 mXPoint += 1;
                 //G_Graph.postDelayed(this,50);
             }
@@ -382,6 +390,14 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
             }
         });
 
+        menu_btn = ppgView.findViewById(R.id.Optional_btn);
+        menu_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                MenuDialog.show();
+            }
+        });
+
         setUiInfo_btn = ppgView.findViewById(R.id.SetUsrInfo_btn);
         setUiInfo_btn.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -391,6 +407,34 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         });
 
         dialogView = View.inflate(inflater.getContext(),R.layout.user_info,null);
+        menu_dialogView = View.inflate(inflater.getContext(),R.layout.menu,null);
+
+        MenuDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext())
+                .setTitle("Option")
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                })
+                .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        TextView scale_tv = MenuDialog.findViewById(R.id.Scale_tv);
+                        TextView ppgtime_tv = MenuDialog.findViewById(R.id.PPG_Time_tv);
+
+                        if(!scale_tv.getText().toString().equals(""))
+                            Scale = Integer.parseInt(scale_tv.getText().toString());
+                        if(!ppgtime_tv.getText().toString().equals(""))
+                            PPGTime = Integer.parseInt(ppgtime_tv.getText().toString());
+                        if(scale_tv.getText().toString().equals("") && ppgtime_tv.getText().toString().equals("")){
+                            Scale = 100;
+                            PPGTime = 5;
+                        }
+                    }
+                });
+        MenuDialog = MenuDialog_Builder.create();
+        MenuDialog.setView(menu_dialogView);
 
         UsrInfoDialog_Builder = new AlertDialog.Builder((Activity)inflater.getContext())
                 .setTitle("CreatUsrInfo")
@@ -557,7 +601,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         long timeStart  = timestampQ.get(startPointer);
                         long timeEnd    = timestampQ.get(endPointer);
 
-                        if((((int)(timeEnd - timestampQ.get(0)))/1000)/60 == 1)
+                        if((((int)(timeEnd - timestampQ.get(0)))/1000)/60 == PPGTime)
                             Flag = true;
 
                         //Log.d("Time", String.valueOf((((int)(timeEnd - timestampQ.get(0)))/1000)/60));
