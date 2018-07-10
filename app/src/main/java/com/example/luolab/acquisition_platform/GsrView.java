@@ -160,6 +160,8 @@ public class GsrView extends Fragment{
 
     private LayoutInflater G_Inflater;
 
+    private int[] FinalData;
+
     private String Get_Uri = "https://lens.csie.ncku.edu.tw/~Platform/getDataFromDB.php";
     private String Insert_Uri = "https://lens.csie.ncku.edu.tw/~Platform/insertDataToDB.php";
     private String Get_Query_Command = "SELECT * FROM PPG";
@@ -282,6 +284,8 @@ public class GsrView extends Fragment{
         TimeDialog_Timer_Handler = new Handler();
         Update_GsrValue = new Handler();
         Graph_Handle = new Handler();
+
+        FinalData = new int[200];
 
         dialogView = View.inflate(inflater.getContext(),R.layout.user_info,null);
 
@@ -691,6 +695,8 @@ public class GsrView extends Fragment{
             public void run() {
                 if(FileFlag == true){
                     try{
+                        int cnt = 0;
+
                         MeanGsrValue = 0.0;
                         c = Calendar.getInstance();
                         //fileWriter[counter] = new FileWriter(FilePath + "/" + dateformat.format(c.getTime()) + UsrInfo[0].getText() + "_" + acupointName[counter] + ".txt",false);
@@ -707,6 +713,9 @@ public class GsrView extends Fragment{
 
                             MeanGsrValue = MeanGsrValue + (data + data2);
 
+                            FinalData[cnt] = (data + data2);
+                            cnt = cnt + 1;
+
                             bw[counter].write(new String(String.valueOf(data + data2)) + " , ");
                         }
 
@@ -720,7 +729,6 @@ public class GsrView extends Fragment{
                         JSONArray jsonArray = null;
 
                         int id = 0;
-                        String acupoint = null;
 
                         try {
                             jsonArray = new JSONArray(result);
@@ -728,36 +736,21 @@ public class GsrView extends Fragment{
                                 JSONObject jsonData = jsonArray.getJSONObject(i);
                                 if(UsrInfo[0].getText().toString().equals(jsonData.getString("name"))){
                                     id = Integer.parseInt(jsonData.getString("id"));
-                                    acupoint = jsonData.getString("acupoint");
                                 }
                             }
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
-                        if(acupoint.equals(acupointName[counter])) {
-                            GetDB(Update_Command_GSR + "name='" + UsrInfo[0].getText().toString() + "',"
-                                    + "age='" + UsrInfo[1].getText().toString() + "',"
-                                    + "birthday='" + UsrInfo[2].getText().toString() + "',"
-                                    + "height='" + UsrInfo[3].getText().toString() + "',"
-                                    + "weight='" + UsrInfo[4].getText().toString() + "',"
-                                    + "time='" + dateformat.format(c.getTime()) + "',"
-                                    + "samplerate='30',"
-                                    + "acupoint='" + acupointName[counter] + "',"
-                                    + "value='" + "123" + "' WHERE id=" + id, Insert_Uri);
-                            Toast.makeText(G_Inflater.getContext(),"in",Toast.LENGTH_SHORT).show();
-                        }else{
-                            GetDB("INSERT INTO GSR (name,age,birthday,height,weight,time,samplerate,acupoint,value)VALUES('"
-                                    + UsrInfo[0].getText().toString() + "','"
-                                    + UsrInfo[1].getText().toString() + "','"
-                                    + UsrInfo[2].getText().toString() + "','"
-                                    + UsrInfo[3].getText().toString() + "','"
-                                    + UsrInfo[4].getText().toString() + "','"
-                                    + dateformat.format(c.getTime()) + "','"
-                                    + "40','"
-                                    + acupointName[counter] + "','"
-                                    + "123')", Insert_Uri);
-                            Toast.makeText(G_Inflater.getContext(),"in2",Toast.LENGTH_SHORT).show();
-                        }
+
+                        GetDB(Update_Command_GSR + "name='" + UsrInfo[0].getText().toString() + "',"
+                                + "age='" + UsrInfo[1].getText().toString() + "',"
+                                + "birthday='" + UsrInfo[2].getText().toString() + "',"
+                                + "height='" + UsrInfo[3].getText().toString() + "',"
+                                + "weight='" + UsrInfo[4].getText().toString() + "',"
+                                + "time='" + dateformat.format(c.getTime()) + "',"
+                                + "samplerate='30',"
+                                + "value" + counter + "='" + Arrays.toString(FinalData) + "'"
+                                + " WHERE id=" + id, Insert_Uri);
 
                         result = GetDB(Get_Query_Command,Get_Uri);
                         jsonArray = null;
