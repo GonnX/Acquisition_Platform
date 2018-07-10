@@ -24,6 +24,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
+import android.os.StrictMode;
 import android.os.Vibrator;
 import android.support.annotation.Nullable;
 import android.support.annotation.RequiresApi;
@@ -53,6 +54,10 @@ import com.jjoe64.graphview.GridLabelRenderer;
 import com.jjoe64.graphview.Viewport;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -149,15 +154,20 @@ public class GsrView extends Fragment{
     private ArrayAdapter<String> usrInfo_Adapter;
     private ArrayList<String> usrInfo_Array;
 
-    private Cursor cursor;
-
     private String SpinnerSelected;
-
-    private Handler DBHandler;
 
     private boolean SerialFlag = false;
 
     private LayoutInflater G_Inflater;
+
+    private String Get_Uri = "https://lens.csie.ncku.edu.tw/~Platform/getDataFromDB.php";
+    private String Insert_Uri = "https://lens.csie.ncku.edu.tw/~Platform/insertDataToDB.php";
+    private String Get_Query_Command = "SELECT * FROM PPG";
+    private String Get_Query_Command_GSR = "SELECT * FROM GSR";
+    private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight)VALUES";
+    private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight)VALUES";
+    private String Update_Command = "UPDATE PPG SET ";
+    private String Update_Command_GSR = "UPDATE GSR SET ";
 
     public final String ACTION_USB_PERMISSION = "com.hariharan.arduinousb.USB_PERMISSION";
     UsbManager usbManager;
@@ -189,7 +199,7 @@ public class GsrView extends Fragment{
                             serialPort.setFlowControl(UsbSerialInterface.FLOW_CONTROL_OFF);
                             serialPort.read(mCallback);
                             SerialFlag = true;
-                            setEnabledUi(0);
+                            setEnabledUi(2);
                         } else {
                             Log.d("SERIAL", "PORT NOT OPEN");
                         }
@@ -228,24 +238,19 @@ public class GsrView extends Fragment{
     }
     private void updateDB()
     {
-        DBHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
+        usrInfo_Array.clear();
 
-                usrInfo_Array.clear();
-
-                cursor = myDBHelper.query();
-
-                if (cursor.moveToFirst()) {
-                    usrInfo_Array.add(cursor.getString(1));
-
-                    while (cursor.moveToNext())
-                        usrInfo_Array.add(cursor.getString(1));
-                }
-                DBHandler.postDelayed(this, 500);
-
+        String result = GetDB(Get_Query_Command_GSR,Get_Uri);
+        JSONArray jsonArray = null;
+        try {
+            jsonArray = new JSONArray(result);
+            for(int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonData = jsonArray.getJSONObject(i);
+                usrInfo_Array.add(jsonData.getString("name"));
             }
-        },500);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
     @RequiresApi(api = Build.VERSION_CODES.M)
     public View onCreateView(final LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
@@ -303,33 +308,66 @@ public class GsrView extends Fragment{
                     Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
                 }
                 else {
-                    myDBHelper.insert(UsrInfo[0].getText().toString(),UsrInfo[1].getText().toString(),
-                            UsrInfo[2].getText().toString(),UsrInfo[3].getText().toString(),
-                            UsrInfo[4].getText().toString());
+                    boolean flag = false;
+                    String result = GetDB(Get_Query_Command_GSR,Get_Uri);
+                    JSONArray jsonArray = null;
+                    try {
+                        jsonArray = new JSONArray(result);
+                        for(int i = 0; i < jsonArray.length(); i++) {
+                            JSONObject jsonData = jsonArray.getJSONObject(i);
+                            if(UsrInfo[0].getText().toString().equals(jsonData.getString("name"))){
+                                flag = true;
+                            }
+                        }
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    if(flag == false) {
+                        GetDB(Insert_Query_Command +
+                                "('" + UsrInfo[0].getText().toString() + "','"
+                                + UsrInfo[1].getText().toString() + "','"
+                                + UsrInfo[2].getText().toString() + "','"
+                                + UsrInfo[3].getText().toString() + "','"
+                                + UsrInfo[4].getText().toString() + "')", Insert_Uri);
+                        GetDB(Insert_Query_Command_GSR +
+                                "('" + UsrInfo[0].getText().toString() + "','"
+                                + UsrInfo[1].getText().toString() + "','"
+                                + UsrInfo[2].getText().toString() + "','"
+                                + UsrInfo[3].getText().toString() + "','"
+                                + UsrInfo[4].getText().toString() + "')", Insert_Uri);
+                        usrInfo_Array.add(UsrInfo[0].getText().toString());
+                    }
 
                     usrInfo_Array.add(UsrInfo[0].getText().toString());
                     Toast.makeText(inflater.getContext(),"設定完成",Toast.LENGTH_SHORT).show();
-                    setEnabledUi(2);
+                    //setEnabledUi(2);
                 }
             }
         });
         UsrInfoDialog = UsrInfoDialog_Builder.create();
         UsrInfoDialog.setView(dialogView);
 
-        DBHandler = new Handler();
-        myDBHelper = new MyDBHelper(inflater.getContext());
+        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .penaltyLog()
+                .build());
 
-        cursor = myDBHelper.query();
         usrInfo_Array = new ArrayList<String>();
 
-        cursor = myDBHelper.query();
-        if (cursor.moveToFirst()) {
-            usrInfo_Array.add(cursor.getString(1));
+        String result = GetDB(Get_Query_Command_GSR,Get_Uri);
 
-            while (cursor.moveToNext())
-                usrInfo_Array.add(cursor.getString(1));
+        JSONArray jsonArray = null;
+        try {
+            jsonArray = new JSONArray(result);
+            for(int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonData = jsonArray.getJSONObject(i);
+                usrInfo_Array.add(jsonData.getString("name"));
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
-        updateDB();
 
         usrInfo_Adapter = new ArrayAdapter<String>(inflater.getContext(),R.layout.usr_spinner,R.id.spinner_tv,usrInfo_Array);
 
@@ -340,10 +378,27 @@ public class GsrView extends Fragment{
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 SpinnerSelected = parent.getSelectedItem().toString();
 
-                cursor = myDBHelper.query();
-                cursor.moveToFirst();
+                ArrayList<String> Name = new ArrayList<>();
+                ArrayList<String> Age = new ArrayList<>();
+                ArrayList<String> Birthday = new ArrayList<>();
+                ArrayList<String> Height = new ArrayList<>();
+                ArrayList<String> Weight = new ArrayList<>();
 
-                String temp = cursor.getString(1);
+                String result = GetDB(Get_Query_Command_GSR,Get_Uri);
+                JSONArray jsonArray = null;
+                try {
+                    jsonArray = new JSONArray(result);
+                    for(int i = 0; i < jsonArray.length(); i++) {
+                        JSONObject jsonData = jsonArray.getJSONObject(i);
+                        Name.add(jsonData.getString("name"));
+                        Age.add(jsonData.getString("age"));
+                        Birthday.add(jsonData.getString("birthday"));
+                        Height.add(jsonData.getString("height"));
+                        Weight.add(jsonData.getString("weight"));
+                    }
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
 
                 UsrInfo[0] = UsrInfoDialog.findViewById(R.id.Name_tv);
                 UsrInfo[1] = UsrInfoDialog.findViewById(R.id.Age_tv);
@@ -351,24 +406,14 @@ public class GsrView extends Fragment{
                 UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
                 UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
 
-                if(temp.equals(SpinnerSelected)){
-                    UsrInfo[0].setText(cursor.getString(1));
-                    UsrInfo[1].setText(cursor.getString(2));
-                    UsrInfo[2].setText(cursor.getString(3));
-                    UsrInfo[3].setText(cursor.getString(4));
-                    UsrInfo[4].setText(cursor.getString(5));
-                }else {
-                    while (cursor.moveToNext()) {
-                        temp = cursor.getString(1);
-                        if (temp.equals(SpinnerSelected)) {
-                            UsrInfo[0].setText(cursor.getString(1));
-                            UsrInfo[1].setText(cursor.getString(2));
-                            UsrInfo[2].setText(cursor.getString(3));
-                            UsrInfo[3].setText(cursor.getString(4));
-                            UsrInfo[4].setText(cursor.getString(5));
-                            break;
-                        }
-
+                for(int i = 0 ; i < Name.size() ;i++){
+                    if(Name.get(i).equals(SpinnerSelected)){
+                        UsrInfo[0].setText(Name.get(i));
+                        UsrInfo[1].setText(Age.get(i));
+                        UsrInfo[2].setText(Birthday.get(i));
+                        UsrInfo[3].setText(Height.get(i));
+                        UsrInfo[4].setText(Weight.get(i));
+                        break;
                     }
                 }
             }
@@ -472,9 +517,9 @@ public class GsrView extends Fragment{
                         .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
-//                                if(selectSampleRate != null && SerialFlag != false) {
-//                                    setEnabledUi(0);
-//                                }
+                                if(selectSampleRate != null && SerialFlag != false) {
+                                    setEnabledUi(0);
+                                }
                             }
                         })
                         .setSingleChoiceItems(sampleRate_Item, -1, new DialogInterface.OnClickListener() {
@@ -493,6 +538,7 @@ public class GsrView extends Fragment{
         setUsrInfoBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                updateDB();
                 UsrInfoDialog.show();
             }
         });
@@ -500,7 +546,28 @@ public class GsrView extends Fragment{
         setEnabledUi(1);
         UpdateGsrValue(inflater);
         onClickStart();
+        updateDB();
         return gsrView;
+    }
+    private String GetDB(String Query_Command,String uri)
+    {
+        String result = null;
+        try {
+            result = DBConnector.executeQuery(Query_Command,uri);
+                /*
+                    SQL 結果有多筆資料時使用JSONArray
+                    只有一筆資料時直接建立JSONObject物件
+                    JSONObject jsonData = new JSONObject(result);
+                */
+//            JSONArray jsonArray = new JSONArray(result);
+//            for(int i = 0; i < jsonArray.length(); i++) {
+//                JSONObject jsonData = jsonArray.getJSONObject(i);
+//
+//                usrInfo_Array.add(jsonData.getString("name"));
+//            }
+        } catch(Exception e) {
+        }
+        return result;
     }
 //    private void CheckFileExists(LayoutInflater inflater)
 //    {
@@ -642,11 +709,79 @@ public class GsrView extends Fragment{
 
                             bw[counter].write(new String(String.valueOf(data + data2)) + " , ");
                         }
+
                         MeanGsrValue = MeanGsrValue / Double.parseDouble(selectSampleRate);
                         TempMeanGsrValue = MeanGsrValue;
                         MeanGsrValue = (1024+2*MeanGsrValue)/(512-MeanGsrValue)/10;
                         bw[counter].write(" ]");
                         bw[counter].close();
+
+                        String result = GetDB(Get_Query_Command_GSR,Get_Uri);
+                        JSONArray jsonArray = null;
+
+                        int id = 0;
+                        String acupoint = null;
+
+                        try {
+                            jsonArray = new JSONArray(result);
+                            for(int i = 0; i < jsonArray.length(); i++) {
+                                JSONObject jsonData = jsonArray.getJSONObject(i);
+                                if(UsrInfo[0].getText().toString().equals(jsonData.getString("name"))){
+                                    id = Integer.parseInt(jsonData.getString("id"));
+                                    acupoint = jsonData.getString("acupoint");
+                                }
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        if(acupoint.equals(acupointName[counter])) {
+                            GetDB(Update_Command_GSR + "name='" + UsrInfo[0].getText().toString() + "',"
+                                    + "age='" + UsrInfo[1].getText().toString() + "',"
+                                    + "birthday='" + UsrInfo[2].getText().toString() + "',"
+                                    + "height='" + UsrInfo[3].getText().toString() + "',"
+                                    + "weight='" + UsrInfo[4].getText().toString() + "',"
+                                    + "time='" + dateformat.format(c.getTime()) + "',"
+                                    + "samplerate='30',"
+                                    + "acupoint='" + acupointName[counter] + "',"
+                                    + "value='" + "123" + "' WHERE id=" + id, Insert_Uri);
+                            Toast.makeText(G_Inflater.getContext(),"in",Toast.LENGTH_SHORT).show();
+                        }else{
+                            GetDB("INSERT INTO GSR (name,age,birthday,height,weight,time,samplerate,acupoint,value)VALUES('"
+                                    + UsrInfo[0].getText().toString() + "','"
+                                    + UsrInfo[1].getText().toString() + "','"
+                                    + UsrInfo[2].getText().toString() + "','"
+                                    + UsrInfo[3].getText().toString() + "','"
+                                    + UsrInfo[4].getText().toString() + "','"
+                                    + dateformat.format(c.getTime()) + "','"
+                                    + "40','"
+                                    + acupointName[counter] + "','"
+                                    + "123')", Insert_Uri);
+                            Toast.makeText(G_Inflater.getContext(),"in2",Toast.LENGTH_SHORT).show();
+                        }
+
+                        result = GetDB(Get_Query_Command,Get_Uri);
+                        jsonArray = null;
+
+                        id = 0;
+
+                        try {
+                            jsonArray = new JSONArray(result);
+                            for(int i = 0; i < jsonArray.length(); i++) {
+                                JSONObject jsonData = jsonArray.getJSONObject(i);
+                                if(UsrInfo[0].getText().toString().equals(jsonData.getString("name"))){
+                                    id = Integer.parseInt(jsonData.getString("id"));
+                                }
+                            }
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+                        GetDB(Update_Command + "name='" + UsrInfo[0].getText().toString() + "',"
+                                + "age='" + UsrInfo[1].getText().toString() + "',"
+                                + "birthday='" + UsrInfo[2].getText().toString() + "',"
+                                + "height='" + UsrInfo[3].getText().toString() + "',"
+                                + "weight='" + UsrInfo[4].getText().toString() + "' WHERE id=" + id,Insert_Uri);
+
                         FileFlag = false;
                     }catch(IOException e){
                         e.printStackTrace();

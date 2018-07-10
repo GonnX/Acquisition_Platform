@@ -71,7 +71,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     private Handler mHandler;
     private Handler fileHandler;
-    private Handler DBHandler;
 
     private LayoutInflater LInflater;
 
@@ -549,8 +548,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 .penaltyLog()
                 .build());
 
-        DBHandler = new Handler();
-
         usrInfo_Array = new ArrayList<String>();
 
         String result = GetDB(Get_Query_Command,Get_Uri);
@@ -675,13 +672,6 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         } catch(Exception e) {
         }
         return result;
-    }
-    private void InsertDB(String Query_Command,String uri)
-    {
-        try {
-            DBConnector.executeQuery(Query_Command,uri);
-        } catch(Exception e) {
-        }
     }
     private void FFTTHREAD()
     {
