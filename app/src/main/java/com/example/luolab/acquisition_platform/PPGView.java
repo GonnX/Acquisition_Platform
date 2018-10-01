@@ -288,6 +288,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                                              + "mtime='" + PPGTime + "',"
                                              + "time='" + dateformat.format(c.getTime()) + "',"
                                              + "samplerate='30',"
+                                             + "Avg='" + BPM + "',"
                                              + "value='" + Arrays.toString(dataQ.toArray(0, endPointer, 0)) + "' WHERE id=" + id,Insert_Uri);
 
                         result = GetDB(Get_Query_Command_GSR,Get_Uri);

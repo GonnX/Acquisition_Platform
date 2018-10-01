@@ -147,6 +147,7 @@ public class GsrView extends Fragment{
     private TextView GsrValue_tv;
     private double MeanGsrValue = 0.0;
     private double TempMeanGsrValue = 0.0;
+    private double TestTemp = 0.0;
 
     private MyDBHelper myDBHelper;
 
@@ -275,7 +276,9 @@ public class GsrView extends Fragment{
         acupointImage = gsrView.findViewById(R.id.Gsr_ImageView);
 
         imageResource = new Object[]{R.drawable.one,R.drawable.two,R.drawable.three,
-                                     R.drawable.four,R.drawable.five,R.drawable.six};
+                                     R.drawable.four,R.drawable.five,R.drawable.six,
+                                     R.drawable.seven,R.drawable.eight,R.drawable.nine,
+                                     R.drawable.ten,R.drawable.eleven,R.drawable.twelve};
 
         GsrValue_tv = gsrView.findViewById(R.id.GsrAvg_tv);
 
@@ -435,12 +438,12 @@ public class GsrView extends Fragment{
 
         startFlag = false;
 
-        acupointName = new String[]{"太淵","大陵","神門","陽谷","陽池","陽谿"};
+        acupointName = new String[]{"太淵","大陵","神門","陽谷","陽池","陽谿","束骨","太沖","衝陽","太白","邱墟","大鍾"};
         sampleRate_Item = new String[]{"50","100","200"};
         selectSampleRate = null;
 
-        fileWriter = new FileWriter[6];
-        bw = new BufferedWriter[6];
+        fileWriter = new FileWriter[12];
+        bw = new BufferedWriter[12];
 
         for(int i = 0 ; i < fileWriter.length ; i++) {
             fileWriter[i] = null;
@@ -548,9 +551,14 @@ public class GsrView extends Fragment{
         });
 
         setEnabledUi(1);
+
         UpdateGsrValue(inflater);
         onClickStart();
         updateDB();
+
+        //nextBtn.setEnabled(true);
+        //backBtn.setEnabled(true);
+
         return gsrView;
     }
     private String GetDB(String Query_Command,String uri)
@@ -720,10 +728,12 @@ public class GsrView extends Fragment{
                         }
 
                         MeanGsrValue = MeanGsrValue / Double.parseDouble(selectSampleRate);
+                        TestTemp = MeanGsrValue;
                         TempMeanGsrValue = MeanGsrValue;
                         MeanGsrValue = (1024+2*MeanGsrValue)/(512-MeanGsrValue)/10;
                         bw[counter].write(" ]");
                         bw[counter].close();
+
 
                         String result = GetDB(Get_Query_Command_GSR,Get_Uri);
                         JSONArray jsonArray = null;
@@ -741,6 +751,8 @@ public class GsrView extends Fragment{
                         } catch (JSONException e) {
                             e.printStackTrace();
                         }
+                        //+ "Avg='" + MeanGsrValue + "',"
+
 
                         GetDB(Update_Command_GSR + "name='" + UsrInfo[0].getText().toString() + "',"
                                 + "age='" + UsrInfo[1].getText().toString() + "',"
@@ -749,6 +761,7 @@ public class GsrView extends Fragment{
                                 + "weight='" + UsrInfo[4].getText().toString() + "',"
                                 + "time='" + dateformat.format(c.getTime()) + "',"
                                 + "samplerate='30',"
+                                + "Avg='" + MeanGsrValue + "',"
                                 + "value" + counter + "='" + Arrays.toString(FinalData) + "'"
                                 + " WHERE id=" + id, Insert_Uri);
 
@@ -776,6 +789,7 @@ public class GsrView extends Fragment{
                                 + "weight='" + UsrInfo[4].getText().toString() + "' WHERE id=" + id,Insert_Uri);
 
                         FileFlag = false;
+
                     }catch(IOException e){
                         e.printStackTrace();
                     }
@@ -925,7 +939,6 @@ public class GsrView extends Fragment{
 //                    SetChoice(buf,size,inflater);
 //                }
 //            });
-
     }
 
     private boolean isEmpty()
@@ -981,8 +994,9 @@ public class GsrView extends Fragment{
     }
     private void NextBtn_Click(LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
-        if(counter == 5) {
-            UpdateAcupointImage(1, 5);
+        // 改成12張圖片
+        if(counter == 11) {
+            UpdateAcupointImage(1, 11);
             new AlertDialog.Builder((Activity)inflater.getContext()).setMessage("已量完，已是最後一個量測點" + '\n' + '\n' + "如需量測別的受測者" + '\n' + "請按setUsrInfo更改")
                     .setPositiveButton("ok", new DialogInterface.OnClickListener() {
                         @Override
