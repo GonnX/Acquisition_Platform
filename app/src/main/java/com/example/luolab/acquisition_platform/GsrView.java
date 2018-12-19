@@ -163,10 +163,10 @@ public class GsrView extends Fragment{
 
     private int[] FinalData;
 
-    private String Get_Uri = "https://lens.csie.ncku.edu.tw/~Platform/getDataFromDB.php";
-    private String Insert_Uri = "https://lens.csie.ncku.edu.tw/~Platform/insertDataToDB.php";
+    private String Get_Uri = "http://140.116.164.6/getDataFromDB.php";
+    private String Insert_Uri = "http://140.116.164.6/insertDataToDB.php";
     private String Get_Query_Command = "SELECT * FROM PPG";
-    private String Get_Query_Command_GSR = "SELECT * FROM GSR";
+    private String Get_Query_Command_GSR = "SELECT * FROM gsr";
     private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight)VALUES";
     private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight)VALUES";
     private String Update_Command = "UPDATE PPG SET ";
@@ -555,7 +555,7 @@ public class GsrView extends Fragment{
         UpdateGsrValue(inflater);
         onClickStart();
         updateDB();
-
+        setSampleRateBtn.setEnabled(true);
         //nextBtn.setEnabled(true);
         //backBtn.setEnabled(true);
 
@@ -752,8 +752,8 @@ public class GsrView extends Fragment{
                             e.printStackTrace();
                         }
                         //+ "Avg='" + MeanGsrValue + "',"
-
-
+                        //+ "value" + counter + "='" + Arrays.toString(FinalData) + "'"
+                        //+ "value" + counter + "='" + Arrays.toString(FinalData) + "'"
                         GetDB(Update_Command_GSR + "name='" + UsrInfo[0].getText().toString() + "',"
                                 + "age='" + UsrInfo[1].getText().toString() + "',"
                                 + "birthday='" + UsrInfo[2].getText().toString() + "',"
@@ -762,8 +762,9 @@ public class GsrView extends Fragment{
                                 + "time='" + dateformat.format(c.getTime()) + "',"
                                 + "samplerate='30',"
                                 + "Avg='" + MeanGsrValue + "',"
-                                + "value" + counter + "='" + Arrays.toString(FinalData) + "'"
+                                + "value" + counter + "='" + MeanGsrValue + "M'"
                                 + " WHERE id=" + id, Insert_Uri);
+
 
                         result = GetDB(Get_Query_Command,Get_Uri);
                         jsonArray = null;
@@ -992,16 +993,15 @@ public class GsrView extends Fragment{
 
         serialPort.write(Data);
     }
-    private void NextBtn_Click(LayoutInflater inflater){
+    private void NextBtn_Click(final LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
         // 改成12張圖片
         if(counter == 11) {
-            UpdateAcupointImage(1, 11);
+            UpdateAcupointImage(1, counter);
             new AlertDialog.Builder((Activity)inflater.getContext()).setMessage("已量完，已是最後一個量測點" + '\n' + '\n' + "如需量測別的受測者" + '\n' + "請按setUsrInfo更改")
                     .setPositiveButton("ok", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
-
                         }
                     })
                     .create()
@@ -1013,7 +1013,7 @@ public class GsrView extends Fragment{
     private void BackBtn_Click(LayoutInflater inflater){
         ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,50}, -1);
         if(counter == 0)
-            UpdateAcupointImage(2,0);
+            UpdateAcupointImage(2,counter);
         else
             UpdateAcupointImage(2,--counter);
     }

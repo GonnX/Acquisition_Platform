@@ -97,6 +97,11 @@ public class MainActivity extends AppCompatActivity{
         tabTwo.setText("GSR");
         //tabOne.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ppg, 0, 0);
         tabLayout.getTabAt(1).setCustomView(tabTwo);
+
+        TextView tabThree = (TextView) LayoutInflater.from(this).inflate(R.layout.custom_tab, null);
+        tabThree.setText("Data");
+        //tabOne.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ppg, 0, 0);
+        tabLayout.getTabAt(2).setCustomView(tabThree);
     }
 
 
@@ -137,9 +142,13 @@ public class MainActivity extends AppCompatActivity{
             {
                 rootView = (new PPGView()).onCreateView(inflater, container, savedInstanceState);
             }
-            else
+            else if(getArguments().getInt(ARG_SECTION_NUMBER) == 2)
             {
                 rootView = (new GsrView()).onCreateView(inflater, container, savedInstanceState);
+            }
+            else
+            {
+                rootView = (new ShowData()).onCreateView(inflater, container, savedInstanceState);
             }
 
             return rootView;
@@ -167,7 +176,7 @@ public class MainActivity extends AppCompatActivity{
         @Override
         public int getCount() {
             // Show 2 total pages.
-            return 2;
+            return 3;
         }
     }
 }

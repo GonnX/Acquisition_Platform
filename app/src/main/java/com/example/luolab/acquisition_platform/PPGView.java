@@ -141,10 +141,10 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private int PPGTime = 5;
     private int Scale = 100;
 
-    private String Get_Uri = "https://lens.csie.ncku.edu.tw/~Platform/getDataFromDB.php";
-    private String Insert_Uri = "https://lens.csie.ncku.edu.tw/~Platform/insertDataToDB.php";
+    private String Get_Uri = "http://140.116.164.6/getDataFromDB.php";
+    private String Insert_Uri = "http://140.116.164.6/insertDataToDB.php";
     private String Get_Query_Command = "SELECT * FROM PPG";
-    private String Get_Query_Command_GSR = "SELECT * FROM GSR";
+    private String Get_Query_Command_GSR = "SELECT * FROM gsr";
     private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight)VALUES";
     private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight)VALUES";
     private String Update_Command = "UPDATE PPG SET ";
@@ -344,7 +344,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         first_fft_run = true;
         keep_thread_running = false;
         init_frames_discard = false;
-        FPS = 30;
+        FPS = 25;
         BPM = 0;
         state_fft = 0;
         Flag = false;
@@ -630,7 +630,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         first_fft_run = true;
         keep_thread_running = false;
         init_frames_discard = false;
-        FPS = 30;
+        FPS = 25;
         BPM = 0;
         state_fft = 0;
 
@@ -763,7 +763,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 int image_got_local = -1;
 
                 mOpenCvCameraView.turnFlashOn();
-                mOpenCvCameraView.setFrameRate(30000, 30000);           //We are trying to get 30FPS constant rate
+                mOpenCvCameraView.setFrameRate(25000, 25000);           //We are trying to get 30FPS constant rate
                 while(keep_thread_running){
 
                     //We will wait till a new frame is received

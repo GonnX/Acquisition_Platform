@@ -1,5 +1,8 @@
 package com.example.luolab.acquisition_platform;
 
+import android.util.Log;
+import android.widget.Toast;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -39,7 +42,7 @@ public class DBConnector {
             inputStream.close();
             result = builder.toString();
         } catch(Exception e) {
-            // Log.e("log_tag", e.toString());
+            Log.e("log_tag", e.toString());
         }
 
         return result;
