@@ -878,12 +878,13 @@
             android:orientation="horizontal">
 
             <Button
-                android:id="@+id/Update_btn"
+                android:id="@+id/button2"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:layout_weight="1"
-                android:text="Update_Feature"/>
+                android:text="PPG_Feature_Infromation"
+                android:textSize="12sp"/>
 
             <Button
                 android:id="@+id/button"
@@ -891,7 +892,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:layout_weight="1"
-                android:text="Download_Feature"/>
+                android:text="GSR_Feature_Information"
+                android:textSize="12sp"/>
         </LinearLayout>
     </LinearLayout>
 

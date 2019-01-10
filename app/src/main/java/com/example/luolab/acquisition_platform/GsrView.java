@@ -139,7 +139,7 @@ public class GsrView extends Fragment{
     private FileWriter[] fileWriter;
     private BufferedWriter[] bw;
 
-    private TextView[] UsrInfo = new TextView[5];
+    private TextView[] UsrInfo = new TextView[6];
 
     private Calendar c;
     private SimpleDateFormat dateformat;
@@ -167,8 +167,8 @@ public class GsrView extends Fragment{
     private String Insert_Uri = "http://140.116.164.6/insertDataToDB.php";
     private String Get_Query_Command = "SELECT * FROM PPG";
     private String Get_Query_Command_GSR = "SELECT * FROM gsr";
-    private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight)VALUES";
-    private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight)VALUES";
+    private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight,doctor)VALUES";
+    private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight,doctor)VALUES";
     private String Update_Command = "UPDATE PPG SET ";
     private String Update_Command_GSR = "UPDATE GSR SET ";
 
@@ -308,9 +308,10 @@ public class GsrView extends Fragment{
                 UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
                 UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
                 UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+                UsrInfo[5] = UsrInfoDialog.findViewById(R.id.doctor_Name_tv);
 
                 if(UsrInfo[0].getText().toString().equals("") || UsrInfo[1].getText().toString().equals("") || UsrInfo[2].getText().toString().equals("") ||
-                    UsrInfo[3].getText().toString().equals("") || UsrInfo[4].getText().toString().equals(""))
+                    UsrInfo[3].getText().toString().equals("") || UsrInfo[4].getText().toString().equals("") || UsrInfo[5].getText().toString().equals(""))
                 {
                     Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
                 }
@@ -335,13 +336,15 @@ public class GsrView extends Fragment{
                                 + UsrInfo[1].getText().toString() + "','"
                                 + UsrInfo[2].getText().toString() + "','"
                                 + UsrInfo[3].getText().toString() + "','"
-                                + UsrInfo[4].getText().toString() + "')", Insert_Uri);
+                                + UsrInfo[4].getText().toString() + "','"
+                                + UsrInfo[5].getText().toString() + "')", Insert_Uri);
                         GetDB(Insert_Query_Command_GSR +
                                 "('" + UsrInfo[0].getText().toString() + "','"
                                 + UsrInfo[1].getText().toString() + "','"
                                 + UsrInfo[2].getText().toString() + "','"
                                 + UsrInfo[3].getText().toString() + "','"
-                                + UsrInfo[4].getText().toString() + "')", Insert_Uri);
+                                + UsrInfo[4].getText().toString() + "','"
+                                + UsrInfo[5].getText().toString() + "')", Insert_Uri);
                         usrInfo_Array.add(UsrInfo[0].getText().toString());
                     }
 
@@ -390,6 +393,7 @@ public class GsrView extends Fragment{
                 ArrayList<String> Birthday = new ArrayList<>();
                 ArrayList<String> Height = new ArrayList<>();
                 ArrayList<String> Weight = new ArrayList<>();
+                ArrayList<String> Doctor = new ArrayList<>();
 
                 String result = GetDB(Get_Query_Command_GSR,Get_Uri);
                 JSONArray jsonArray = null;
@@ -402,6 +406,7 @@ public class GsrView extends Fragment{
                         Birthday.add(jsonData.getString("birthday"));
                         Height.add(jsonData.getString("height"));
                         Weight.add(jsonData.getString("weight"));
+                        Doctor.add(jsonData.getString("doctor"));
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -412,6 +417,7 @@ public class GsrView extends Fragment{
                 UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
                 UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
                 UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+                UsrInfo[5] = UsrInfoDialog.findViewById(R.id.doctor_Name_tv);
 
                 for(int i = 0 ; i < Name.size() ;i++){
                     if(Name.get(i).equals(SpinnerSelected)){
@@ -420,6 +426,7 @@ public class GsrView extends Fragment{
                         UsrInfo[2].setText(Birthday.get(i));
                         UsrInfo[3].setText(Height.get(i));
                         UsrInfo[4].setText(Weight.get(i));
+                        UsrInfo[5].setText(Doctor.get(i));
                         break;
                     }
                 }
@@ -529,7 +536,7 @@ public class GsrView extends Fragment{
                                 }
                             }
                         })
-                        .setSingleChoiceItems(sampleRate_Item, -1, new DialogInterface.OnClickListener() {
+                        .setSingleChoiceItems(sampleRate_Item, 2, new DialogInterface.OnClickListener() {
                             @Override
                             public void onClick(DialogInterface dialog, int which) {
                                 selectSampleRate = sampleRate_Item[which];
@@ -540,6 +547,8 @@ public class GsrView extends Fragment{
                         .show();
             }
         });
+
+        selectSampleRate = "200";
 
         setUsrInfoBtn = gsrView.findViewById(R.id.setUsrInfo_btn);
         setUsrInfoBtn.setOnClickListener(new View.OnClickListener() {
@@ -607,11 +616,11 @@ public class GsrView extends Fragment{
             }
         });
     }
-    private void UpdateGraph(final int size,LayoutInflater inflater){
+    private void UpdateGraph(final int size, final LayoutInflater inflater){
         G_Graph.post(new Runnable() {
             @Override
             public void run() {
-                AppedSeriesData(size);
+                AppedSeriesData(size,inflater);
                 G_Graph.getViewport().setMaxX(mXPoint);
                 G_Graph.getViewport().setMinX(0);
                 //G_Graph.getViewport().setMinX(mXPoint - 1);
@@ -620,7 +629,7 @@ public class GsrView extends Fragment{
             }
         });
     }
-    private void AppedSeriesData(int size)
+    private void AppedSeriesData(int size,LayoutInflater inflater)
     {
         if(size % 2 != 0){
             TempSize[SizeIndex] = size;
@@ -664,8 +673,10 @@ public class GsrView extends Fragment{
                 G_Series.appendData(new DataPoint(mXPoint++,data + data2), true, 400);
             }
         }
-        if(mXPoint == Integer.parseInt(selectSampleRate))
+        if(mXPoint == Integer.parseInt(selectSampleRate)) {
             FileFlag = true;
+            ((Vibrator) inflater.getContext().getSystemService(Service.VIBRATOR_SERVICE)).vibrate(new long[]{0,500}, -1);
+        }
         SizeIndex++;
     }
     private void SetFileHeader(BufferedWriter bw)
@@ -762,8 +773,9 @@ public class GsrView extends Fragment{
                                 + "time='" + dateformat.format(c.getTime()) + "',"
                                 + "samplerate='30',"
                                 + "Avg='" + MeanGsrValue + "',"
-                                + "value" + counter + "='" + MeanGsrValue + "M'"
-                                + " WHERE id=" + id, Insert_Uri);
+                                + "value" + counter + "='" + MeanGsrValue + "M',"
+                                + "doctor='" + UsrInfo[5].getText().toString()
+                                + "' WHERE id=" + id, Insert_Uri);
 
 
                         result = GetDB(Get_Query_Command,Get_Uri);
@@ -787,7 +799,11 @@ public class GsrView extends Fragment{
                                 + "age='" + UsrInfo[1].getText().toString() + "',"
                                 + "birthday='" + UsrInfo[2].getText().toString() + "',"
                                 + "height='" + UsrInfo[3].getText().toString() + "',"
-                                + "weight='" + UsrInfo[4].getText().toString() + "' WHERE id=" + id,Insert_Uri);
+                                + "weight='" + UsrInfo[4].getText().toString() + "',"
+                                + "doctor='" + UsrInfo[5].getText().toString()
+                                + "' WHERE id=" + id,Insert_Uri);
+
+                        GetDB("UPDATE whichid SET which='" + id + "' WHERE id=1",Insert_Uri);
 
                         FileFlag = false;
 

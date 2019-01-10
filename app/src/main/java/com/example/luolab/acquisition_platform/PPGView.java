@@ -71,6 +71,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
     private Handler mHandler;
     private Handler fileHandler;
+    private Handler TimeHandler;
 
     private LayoutInflater LInflater;
 
@@ -98,6 +99,8 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private Stack<Long> timestampQ;
 
     private TextView imgProcessed;
+    private TextView time_tv;
+    private TextView Minute_tv;
 
     private Button start_btn;
     private Button setUiInfo_btn;
@@ -108,7 +111,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private View dialogView;
     private View menu_dialogView;
 
-    private TextView[] UsrInfo = new TextView[5];
+    private TextView[] UsrInfo = new TextView[6];
 
     private AlertDialog.Builder UsrInfoDialog_Builder;
     private AlertDialog UsrInfoDialog;
@@ -120,6 +123,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private LineGraphSeries<DataPoint> G_Series;
 
     private int mXPoint;
+    private boolean Stop_Flag;
 
     private Calendar c;
     private SimpleDateFormat dateformat;
@@ -139,14 +143,17 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
     private int AVGFailCount = 0;
 
     private int PPGTime = 5;
-    private int Scale = 100;
+    private int Scale = 150;
+    private int Time_GET = 0;
+    private int Min_Time_GET = 0;
+    private int Min_Time_Flag = 0;
 
     private String Get_Uri = "http://140.116.164.6/getDataFromDB.php";
     private String Insert_Uri = "http://140.116.164.6/insertDataToDB.php";
     private String Get_Query_Command = "SELECT * FROM PPG";
     private String Get_Query_Command_GSR = "SELECT * FROM gsr";
-    private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight)VALUES";
-    private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight)VALUES";
+    private String Insert_Query_Command = "INSERT INTO PPG (name,age,birthday,height,weight,doctor)VALUES";
+    private String Insert_Query_Command_GSR = "INSERT INTO GSR (name,age,birthday,height,weight,doctor)VALUES";
     private String Update_Command = "UPDATE PPG SET ";
     private String Update_Command_GSR = "UPDATE GSR SET ";
 
@@ -195,6 +202,9 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                     }
                     imgProcessed.setText("" + BPM);
                 }
+                Minute_tv.setText(Integer.toString(Min_Time_GET));
+                time_tv.setText(Integer.toString(Time_GET));
+
             }
         };
     }
@@ -207,6 +217,30 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 //G_Graph.getViewport().setMinX(0);
                 G_Graph.getViewport().setMinX(mXPoint - Scale);
                 mXPoint += 1;
+
+                Time_GET = mXPoint / 25 - Min_Time_Flag;
+
+                if(mXPoint >= 25) {
+                    if (mXPoint == 1500) {
+                        Min_Time_GET = 1;
+                        Min_Time_Flag = 60;
+                    } else if (mXPoint == 3000) {
+                        Min_Time_GET = 2;
+                        Min_Time_Flag = 120;
+                    } else if (mXPoint == 4500) {
+                        Min_Time_GET = 3;
+                        Min_Time_Flag = 180;
+                    } else if (mXPoint == 6000) {
+                        Min_Time_GET = 4;
+                        Min_Time_Flag = 240;
+                    } else if (mXPoint == 7500) {
+                        Min_Time_GET = 5;
+                        Min_Time_Flag = 300;
+                    }
+                }
+                if(mXPoint >= (PPGTime * 1500)) {
+                    Stop_Flag = true;
+                }
                 //G_Graph.postDelayed(this,50);
             }
         });
@@ -232,6 +266,9 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         G_Series = new LineGraphSeries<DataPoint>();
         G_Graph.addSeries(G_Series);
         mXPoint = 0;
+        Time_GET = 0;
+        Min_Time_GET = 0;
+        Min_Time_Flag = 0;
     }
     private void setUi(int state){
         if(state == 0){
@@ -289,7 +326,9 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                                              + "time='" + dateformat.format(c.getTime()) + "',"
                                              + "samplerate='30',"
                                              + "Avg='" + BPM + "',"
-                                             + "value='" + Arrays.toString(dataQ.toArray(0, endPointer, 0)) + "' WHERE id=" + id,Insert_Uri);
+                                             + "value='" + Arrays.toString(dataQ.toArray(0, endPointer, 0)) + "',"
+                                             + "doctor='" + UsrInfo[5].getText().toString()
+                                             + "' WHERE id=" + id,Insert_Uri);
 
                         result = GetDB(Get_Query_Command_GSR,Get_Uri);
                         jsonArray = null;
@@ -312,7 +351,11 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                                 + "age='" + UsrInfo[1].getText().toString() + "',"
                                 + "birthday='" + UsrInfo[2].getText().toString() + "',"
                                 + "height='" + UsrInfo[3].getText().toString() + "',"
-                                + "weight='" + UsrInfo[4].getText().toString() + "' WHERE id=" + id,Insert_Uri);
+                                + "weight='" + UsrInfo[4].getText().toString() + "',"
+                                + "doctor='" + UsrInfo[5].getText().toString()
+                                + "' WHERE id=" + id,Insert_Uri);
+
+                        GetDB("UPDATE whichid SET which='" + id + "' WHERE id=1",Insert_Uri);
 
                         bw = new BufferedWriter(fileWriter);
                         SetFileHeader(bw);
@@ -348,6 +391,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         BPM = 0;
         state_fft = 0;
         Flag = false;
+        Stop_Flag = false;
         appData.image_got = 0;
         appData.frameAv = 0;
     }
@@ -409,11 +453,16 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
 
         fileHandler = new Handler();
 
+        TimeHandler = new Handler();
+
         appData =new UiDataBundle();
         appData.image_got=0;
 
         fileWriter = null;
         bw = null;
+
+        time_tv = ppgView.findViewById(R.id.time_tv);
+        Minute_tv = ppgView.findViewById(R.id.Minute_tv);
 
         dateformat  = new SimpleDateFormat("yyyyMMddHHmmss");
 
@@ -474,7 +523,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         if(!ppgtime_tv.getText().toString().equals(""))
                             PPGTime = Integer.parseInt(ppgtime_tv.getText().toString());
                         if(scale_tv.getText().toString().equals("") && ppgtime_tv.getText().toString().equals("")){
-                            Scale = 100;
+                            Scale = 150;
                             PPGTime = 5;
                         }
                     }
@@ -498,9 +547,10 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
                         UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
                         UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+                        UsrInfo[5] = UsrInfoDialog.findViewById(R.id.doctor_Name_tv);
 
                         if(UsrInfo[0].getText().toString().equals("") || UsrInfo[1].getText().toString().equals("") || UsrInfo[2].getText().toString().equals("") ||
-                                UsrInfo[3].getText().toString().equals("") || UsrInfo[4].getText().toString().equals(""))
+                                UsrInfo[3].getText().toString().equals("") || UsrInfo[4].getText().toString().equals("") || UsrInfo[5].getText().toString().equals(""))
                         {
                             Toast.makeText(inflater.getContext(),"請勿空白，確實填寫",Toast.LENGTH_SHORT).show();
                         }
@@ -525,13 +575,15 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                                         + UsrInfo[1].getText().toString() + "','"
                                         + UsrInfo[2].getText().toString() + "','"
                                         + UsrInfo[3].getText().toString() + "','"
-                                        + UsrInfo[4].getText().toString() + "')", Insert_Uri);
+                                        + UsrInfo[4].getText().toString() + "','"
+                                        + UsrInfo[5].getText().toString() + "')", Insert_Uri);
                                 GetDB(Insert_Query_Command_GSR +
                                         "('" + UsrInfo[0].getText().toString() + "','"
                                         + UsrInfo[1].getText().toString() + "','"
                                         + UsrInfo[2].getText().toString() + "','"
                                         + UsrInfo[3].getText().toString() + "','"
-                                        + UsrInfo[4].getText().toString() + "')", Insert_Uri);
+                                        + UsrInfo[4].getText().toString() + "','"
+                                        + UsrInfo[5].getText().toString() + "')", Insert_Uri);
                                 usrInfo_Array.add(UsrInfo[0].getText().toString());
                             }
                             Toast.makeText(inflater.getContext(),"設定完成",Toast.LENGTH_SHORT).show();
@@ -578,6 +630,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 ArrayList<String> Birthday = new ArrayList<>();
                 ArrayList<String> Height = new ArrayList<>();
                 ArrayList<String> Weight = new ArrayList<>();
+                ArrayList<String> Doctor = new ArrayList<>();
 
                 String result = GetDB(Get_Query_Command,Get_Uri);
                 JSONArray jsonArray = null;
@@ -590,6 +643,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         Birthday.add(jsonData.getString("birthday"));
                         Height.add(jsonData.getString("height"));
                         Weight.add(jsonData.getString("weight"));
+                        Doctor.add(jsonData.getString("doctor"));
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -600,6 +654,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                 UsrInfo[2] = UsrInfoDialog.findViewById(R.id.Brithday_tv);
                 UsrInfo[3] = UsrInfoDialog.findViewById(R.id.Height_tv);
                 UsrInfo[4] = UsrInfoDialog.findViewById(R.id.Weight_tv);
+                UsrInfo[5] = UsrInfoDialog.findViewById(R.id.doctor_Name_tv);
 
 
 
@@ -610,6 +665,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         UsrInfo[2].setText(Birthday.get(i));
                         UsrInfo[3].setText(Height.get(i));
                         UsrInfo[4].setText(Weight.get(i));
+                        UsrInfo[5].setText(Doctor.get(i));
                         break;
                     }
                 }
@@ -679,7 +735,11 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
         myFFTThread = new Thread(){
             @Override
             public void run(){
+
                 while(keep_thread_running){
+                    if(Stop_Flag == true) {
+                        Flag = true;
+                    }
                     if (start_fft == false){
 
                         //Sleeping part may lead to timing problems
@@ -707,8 +767,7 @@ public class PPGView extends Fragment implements CameraBridgeViewBase.CvCameraVi
                         long timeStart  = timestampQ.get(startPointer);
                         long timeEnd    = timestampQ.get(endPointer);
 
-                        if((((int)(timeEnd - timestampQ.get(0)))/1000)/60 == PPGTime)
-                            Flag = true;
+
 
                         //Log.d("Time", String.valueOf((((int)(timeEnd - timestampQ.get(0)))/1000)/60));
 

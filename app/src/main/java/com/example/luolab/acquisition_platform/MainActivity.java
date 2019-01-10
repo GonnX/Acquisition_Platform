@@ -87,21 +87,26 @@ public class MainActivity extends AppCompatActivity{
 
     private void createTabIcons()
     {
+        TextView tabFour = (TextView) LayoutInflater.from(this).inflate(R.layout.custom_tab, null);
+        tabFour.setText("Reg");
+        //tabOne.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ppg, 0, 0);
+        tabLayout.getTabAt(0).setCustomView(tabFour);
+
         TextView tabOne = (TextView) LayoutInflater.from(this).inflate(R.layout.custom_tab, null);
         tabOne.setText("PPG");
 
         //tabOne.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ppg, 0, 0);
-        tabLayout.getTabAt(0).setCustomView(tabOne);
+        tabLayout.getTabAt(1).setCustomView(tabOne);
 
         TextView tabTwo = (TextView) LayoutInflater.from(this).inflate(R.layout.custom_tab, null);
         tabTwo.setText("GSR");
         //tabOne.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ppg, 0, 0);
-        tabLayout.getTabAt(1).setCustomView(tabTwo);
+        tabLayout.getTabAt(2).setCustomView(tabTwo);
 
         TextView tabThree = (TextView) LayoutInflater.from(this).inflate(R.layout.custom_tab, null);
         tabThree.setText("Data");
         //tabOne.setCompoundDrawablesWithIntrinsicBounds(0, R.drawable.ppg, 0, 0);
-        tabLayout.getTabAt(2).setCustomView(tabThree);
+        tabLayout.getTabAt(3).setCustomView(tabThree);
     }
 
 
@@ -140,17 +145,18 @@ public class MainActivity extends AppCompatActivity{
             View rootView;
             if(getArguments().getInt(ARG_SECTION_NUMBER) == 1)
             {
-                rootView = (new PPGView()).onCreateView(inflater, container, savedInstanceState);
+                rootView = (new Register()).onCreateView(inflater, container, savedInstanceState);
             }
             else if(getArguments().getInt(ARG_SECTION_NUMBER) == 2)
+            {
+                rootView = (new PPGView()).onCreateView(inflater, container, savedInstanceState);
+            }
+            else if(getArguments().getInt(ARG_SECTION_NUMBER) == 3)
             {
                 rootView = (new GsrView()).onCreateView(inflater, container, savedInstanceState);
             }
             else
-            {
                 rootView = (new ShowData()).onCreateView(inflater, container, savedInstanceState);
-            }
-
             return rootView;
         }
     }
@@ -176,7 +182,7 @@ public class MainActivity extends AppCompatActivity{
         @Override
         public int getCount() {
             // Show 2 total pages.
-            return 3;
+            return 4;
         }
     }
 }
