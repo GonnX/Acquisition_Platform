@@ -261,19 +261,21 @@ public class ShowData extends Fragment{
         char[] HF = new char[10];
         char[] HRV = new char[10];
 
-        if(PPGValue[15].equals("") != true) {
-            PPGValue[15].getChars(0, 5, HRV, 0);
-            PPGValue[16].getChars(0, 5, LF, 0);
-            PPGValue[17].getChars(0, 5, HF, 0);
+        if(PPGValue[15] != null) {
+            if (PPGValue[15].equals("") != true) {
+                PPGValue[15].getChars(0, 5, HRV, 0);
+                PPGValue[16].getChars(0, 5, LF, 0);
+                PPGValue[17].getChars(0, 5, HF, 0);
 
-            DecimalFormat df = new DecimalFormat("######0.00");
-            Double LF_HF = Double.parseDouble(String.valueOf(LF)) / Double.parseDouble(String.valueOf(HF));
+                DecimalFormat df = new DecimalFormat("######0.00");
+                Double LF_HF = Double.parseDouble(String.valueOf(LF)) / Double.parseDouble(String.valueOf(HF));
 
-            for (int i = 12; i < 27; i++) {
-                Value_Textview[i].setText(PPGValue[i - 12]);
+                for (int i = 12; i < 27; i++) {
+                    Value_Textview[i].setText(PPGValue[i - 12]);
+                }
+                Value_Textview[27].setText(String.valueOf(HRV));
+                Value_Textview[28].setText(String.valueOf(LF) + " / " + String.valueOf(HF) + " = " + df.format(LF_HF));
             }
-            Value_Textview[27].setText(String.valueOf(HRV));
-            Value_Textview[28].setText(String.valueOf(LF) + " / " + String.valueOf(HF) + " = " + df.format(LF_HF));
         }
         //uri = Uri.parse("http://140.116.164.6/UserInformation.php");
         //it = new Intent(Intent.ACTION_VIEW, uri);
@@ -401,20 +403,21 @@ public class ShowData extends Fragment{
         char[] HF = new char[10];
         char[] HRV = new char[10];
 
-        if (PPGValue[15].equals("") != true) {
-            PPGValue[15].getChars(0, 5, HRV, 0);
-            PPGValue[16].getChars(0, 5, LF, 0);
-            PPGValue[17].getChars(0, 5, HF, 0);
+        if(PPGValue[15] != null) {
+            if (PPGValue[15].equals("") != true) {
+                PPGValue[15].getChars(0, 5, HRV, 0);
+                PPGValue[16].getChars(0, 5, LF, 0);
+                PPGValue[17].getChars(0, 5, HF, 0);
 
-            DecimalFormat df = new DecimalFormat("######0.00");
-            Double LF_HF = Double.parseDouble(String.valueOf(LF)) / Double.parseDouble(String.valueOf(HF));
+                DecimalFormat df = new DecimalFormat("######0.00");
+                Double LF_HF = Double.parseDouble(String.valueOf(LF)) / Double.parseDouble(String.valueOf(HF));
 
-            for (int i = 12; i < 27; i++) {
-                Value_Textview[i].setText(PPGValue[i - 12]);
+                for (int i = 12; i < 27; i++) {
+                    Value_Textview[i].setText(PPGValue[i - 12]);
+                }
+                Value_Textview[27].setText(String.valueOf(HRV));
+                Value_Textview[28].setText(String.valueOf(LF) + " / " + String.valueOf(HF) + " = " + df.format(LF_HF));
             }
-            Value_Textview[27].setText(String.valueOf(HRV));
-            Value_Textview[28].setText(String.valueOf(LF) + " / " + String.valueOf(HF) + " = " + df.format(LF_HF));
         }
-
     }
 }

@@ -1,8 +1,11 @@
 package com.example.luolab.acquisition_platform;
 
 import android.annotation.TargetApi;
+import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Service;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Vibrator;
@@ -69,6 +72,9 @@ public class MainActivity extends AppCompatActivity{
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
+
         setContentView(R.layout.activity_main);
         // Create the adapter that will return a fragment for each of the three
         // primary sections of the activity.
